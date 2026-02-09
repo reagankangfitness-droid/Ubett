@@ -5,7 +5,6 @@ const STORAGE_KEYS = {
   items: 'doorcheck_items',
   checks: 'doorcheck:checks',
   lastReset: 'doorcheck:lastReset',
-  streak: 'doorcheck:streak',
 } as const;
 
 export const FREE_TIER_LIMIT = 6;
@@ -25,12 +24,6 @@ export interface LocalCheckItem {
   isActive: boolean;
 }
 
-export interface StreakData {
-  current: number;
-  longest: number;
-  lastDate: string | null; // "YYYY-MM-DD"
-}
-
 const DEFAULT_ITEMS: LocalCheckItem[] = [
   { id: '1', emoji: '\uD83D\uDCF1', label: 'Phone', sortOrder: 0, isActive: true },
   { id: '2', emoji: '\uD83D\uDC5B', label: 'Wallet', sortOrder: 1, isActive: true },
@@ -48,16 +41,9 @@ function todayKey(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function yesterdayKey(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 export function useChecklist() {
   const [items, setItems] = useState<LocalCheckItem[]>([]);
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [streak, setStreak] = useState<StreakData>({ current: 0, longest: 0, lastDate: null });
   const [loading, setLoading] = useState(true);
   const initialized = useRef(false);
 
@@ -65,18 +51,16 @@ export function useChecklist() {
   useEffect(() => {
     (async () => {
       try {
-        const [rawItems, rawChecks, rawReset, rawStreak] = await AsyncStorage.multiGet([
+        const [rawItems, rawChecks, rawReset] = await AsyncStorage.multiGet([
           STORAGE_KEYS.items,
           STORAGE_KEYS.checks,
           STORAGE_KEYS.lastReset,
-          STORAGE_KEYS.streak,
         ]);
 
         const storedItems: LocalCheckItem[] | null = rawItems[1] ? JSON.parse(rawItems[1]) : null;
         const loadedItems = storedItems ?? DEFAULT_ITEMS;
         setItems(loadedItems);
 
-        // First launch: persist defaults
         if (!storedItems) {
           await AsyncStorage.setItem(STORAGE_KEYS.items, JSON.stringify(DEFAULT_ITEMS));
         }
@@ -92,11 +76,6 @@ export function useChecklist() {
           const storedChecks: string[] = rawChecks[1] ? JSON.parse(rawChecks[1]) : [];
           setChecked(new Set(storedChecks));
         }
-
-        const storedStreak: StreakData = rawStreak[1]
-          ? JSON.parse(rawStreak[1])
-          : { current: 0, longest: 0, lastDate: null };
-        setStreak(storedStreak);
       } catch {
         setItems(DEFAULT_ITEMS);
       } finally {
@@ -123,8 +102,10 @@ export function useChecklist() {
   const checkedCount = activeItems.filter((i) => checked.has(i.id)).length;
 
   // ── Toggle a single item ──────────────────────────────────
+  // Returns true if this toggle completes the list.
   const toggle = useCallback(
-    (id: string) => {
+    (id: string): boolean => {
+      let completed = false;
       setChecked((prev) => {
         const next = new Set(prev);
         if (next.has(id)) {
@@ -134,25 +115,10 @@ export function useChecklist() {
         }
 
         const currentActive = items.filter((i) => i.isActive);
-        const willBeAllChecked = currentActive.every((i) => next.has(i.id));
-        if (willBeAllChecked) {
-          const today = todayKey();
-          setStreak((s) => {
-            const isConsecutive = s.lastDate === yesterdayKey() || s.lastDate === today;
-            const newCurrent = s.lastDate === today ? s.current : isConsecutive ? s.current + 1 : 1;
-            const newLongest = Math.max(s.longest, newCurrent);
-            const updated: StreakData = {
-              current: newCurrent,
-              longest: newLongest,
-              lastDate: today,
-            };
-            AsyncStorage.setItem(STORAGE_KEYS.streak, JSON.stringify(updated));
-            return updated;
-          });
-        }
-
+        completed = currentActive.every((i) => next.has(i.id));
         return next;
       });
+      return completed;
     },
     [items],
   );
@@ -199,7 +165,6 @@ export function useChecklist() {
         persistItems(next);
         return next;
       });
-      // Remove from checked set too
       setChecked((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -236,7 +201,6 @@ export function useChecklist() {
     checked,
     allChecked,
     checkedCount,
-    streak,
     loading,
     toggle,
     addItem,

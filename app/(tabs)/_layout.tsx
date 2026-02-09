@@ -38,6 +38,7 @@ export default function TabLayout() {
         name="streaks"
         options={{
           title: 'Streaks',
+          headerShown: false,
           tabBarIcon: ({ color }) => <TabBarIcon name="fire" color={color} />,
         }}
       />

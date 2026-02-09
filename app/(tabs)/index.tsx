@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 
 import { colors } from '@/constants/theme';
 import { useChecklist, type LocalCheckItem, type TimeRule } from '@/hooks/useChecklist';
+import { useStreak } from '@/hooks/useStreak';
 import ChecklistCard from '@/components/ChecklistCard';
 import StreakBar from '@/components/StreakBar';
 import AddItemSheet from '@/components/AddItemSheet';
@@ -18,7 +19,6 @@ export default function CheckScreen() {
     checked,
     allChecked,
     checkedCount,
-    streak,
     loading,
     toggle,
     addItem,
@@ -27,6 +27,8 @@ export default function CheckScreen() {
     reorderItems,
   } = useChecklist();
 
+  const streak = useStreak();
+
   // Sheet state
   const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
@@ -34,7 +36,7 @@ export default function CheckScreen() {
   const [editingItem, setEditingItem] = useState<LocalCheckItem | null>(null);
   const [isReordering, setIsReordering] = useState(false);
 
-  if (loading) {
+  if (loading || streak.loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <Text style={styles.loadingText}>Loading...</Text>
@@ -43,11 +45,15 @@ export default function CheckScreen() {
   }
 
   const handleToggle = (id: string) => {
-    const willBeAllChecked = items.every((i) =>
+    // Check if this toggle will complete the list *before* toggling
+    const willComplete = items.every((i) =>
       i.id === id ? !checked.has(id) : checked.has(i.id),
     );
+
     toggle(id);
-    if (willBeAllChecked) {
+
+    if (willComplete) {
+      streak.recordCheck();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
@@ -182,7 +188,7 @@ export default function CheckScreen() {
       {/* ── Streak bar (pinned to bottom) ─────────── */}
       {!isReordering && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 8 }]}>
-          <StreakBar current={streak.current} longest={streak.longest} />
+          <StreakBar current={streak.currentStreak} longest={streak.longestStreak} />
         </View>
       )}
 
