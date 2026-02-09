@@ -28,6 +28,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Check',
+          headerShown: false,
           tabBarIcon: ({ color }) => (
             <TabBarIcon name="check-circle" color={color} />
           ),
