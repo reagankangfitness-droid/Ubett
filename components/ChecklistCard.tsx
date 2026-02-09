@@ -5,6 +5,7 @@ import Animated, {
   withSequence,
   withSpring,
   withTiming,
+  LinearTransition,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { colors } from '@/constants/theme';
@@ -14,15 +15,32 @@ interface Props {
   label: string;
   isChecked: boolean;
   onToggle: () => void;
+  onLongPress?: () => void;
+  // Reorder mode
+  isReordering?: boolean;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-export default function ChecklistCard({ emoji, label, isChecked, onToggle }: Props) {
+export default function ChecklistCard({
+  emoji,
+  label,
+  isChecked,
+  onToggle,
+  onLongPress,
+  isReordering,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
+}: Props) {
   const scale = useSharedValue(1);
   const checkboxScale = useSharedValue(isChecked ? 1 : 0);
 
-  // Keep the fill in sync when state changes externally (e.g. reset)
   checkboxScale.value = withSpring(isChecked ? 1 : 0, { damping: 12, stiffness: 180 });
 
   const cardStyle = useAnimatedStyle(() => ({
@@ -35,29 +53,71 @@ export default function ChecklistCard({ emoji, label, isChecked, onToggle }: Pro
   }));
 
   const handlePress = () => {
-    // Satisfying "pop" animation on the card
+    if (isReordering) return;
     scale.value = withSequence(
       withTiming(0.97, { duration: 60 }),
       withSpring(1, { damping: 10, stiffness: 300 }),
     );
-
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onToggle();
   };
 
-  return (
-    <AnimatedPressable style={[styles.card, cardStyle]} onPress={handlePress}>
-      {/* Checkbox */}
-      <View style={styles.checkbox}>
-        <Animated.View style={[styles.checkboxFill, fillStyle]}>
-          <Text style={styles.checkmark}>✓</Text>
-        </Animated.View>
-      </View>
+  const handleLongPress = () => {
+    if (isReordering) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onLongPress?.();
+  };
 
-      {/* Emoji + Label */}
-      <Text style={styles.emoji}>{emoji}</Text>
-      <Text style={[styles.label, isChecked && styles.labelChecked]}>{label}</Text>
-    </AnimatedPressable>
+  const handleMove = (direction: 'up' | 'down') => {
+    Haptics.selectionAsync();
+    if (direction === 'up') onMoveUp?.();
+    else onMoveDown?.();
+  };
+
+  return (
+    <Animated.View layout={LinearTransition.springify().damping(18).stiffness(200)}>
+      <AnimatedPressable
+        style={[styles.card, isReordering && styles.cardReorder, cardStyle]}
+        onPress={handlePress}
+        onLongPress={handleLongPress}
+        delayLongPress={400}
+      >
+        {isReordering ? (
+          <>
+            {/* Drag handle icon */}
+            <Text style={styles.dragHandle}>{'\u2630'}</Text>
+            <Text style={styles.emoji}>{emoji}</Text>
+            <Text style={[styles.label, { flex: 1 }]}>{label}</Text>
+            <View style={styles.arrowGroup}>
+              <Pressable
+                style={[styles.arrowBtn, isFirst && styles.arrowBtnDisabled]}
+                onPress={() => handleMove('up')}
+                disabled={isFirst}
+              >
+                <Text style={[styles.arrowText, isFirst && styles.arrowTextDisabled]}>{'\u25B2'}</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.arrowBtn, isLast && styles.arrowBtnDisabled]}
+                onPress={() => handleMove('down')}
+                disabled={isLast}
+              >
+                <Text style={[styles.arrowText, isLast && styles.arrowTextDisabled]}>{'\u25BC'}</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.checkbox}>
+              <Animated.View style={[styles.checkboxFill, fillStyle]}>
+                <Text style={styles.checkmark}>{'\u2713'}</Text>
+              </Animated.View>
+            </View>
+            <Text style={styles.emoji}>{emoji}</Text>
+            <Text style={[styles.label, isChecked && styles.labelChecked]}>{label}</Text>
+          </>
+        )}
+      </AnimatedPressable>
+    </Animated.View>
   );
 }
 
@@ -70,12 +130,16 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 18,
     marginBottom: 10,
-    // subtle shadow
     shadowColor: '#1A1612',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+  },
+  cardReorder: {
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
   },
   checkbox: {
     width: 28,
@@ -112,6 +176,36 @@ const styles = StyleSheet.create({
     fontFamily: 'System',
   },
   labelChecked: {
+    color: colors.inkSoft,
+  },
+
+  // Reorder mode
+  dragHandle: {
+    fontSize: 18,
+    color: colors.inkSoft,
+    marginRight: 12,
+  },
+  arrowGroup: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  arrowBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: colors.cream,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowBtnDisabled: {
+    opacity: 0.3,
+  },
+  arrowText: {
+    fontSize: 12,
+    color: colors.ink,
+    fontWeight: '700',
+  },
+  arrowTextDisabled: {
     color: colors.inkSoft,
   },
 });
