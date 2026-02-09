@@ -3,8 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEYS = {
   items: 'doorcheck_items',
-  checks: 'doorcheck:checks',
-  lastReset: 'doorcheck:lastReset',
+  checks: 'doorcheck_checks',
+  lastReset: 'doorcheck_last_reset',
 } as const;
 
 export const FREE_TIER_LIMIT = 6;
@@ -201,6 +201,7 @@ export function useChecklist() {
     checked,
     allChecked,
     checkedCount,
+    activeItemCount: activeItems.length,
     loading,
     toggle,
     addItem,

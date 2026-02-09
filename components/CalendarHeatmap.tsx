@@ -112,7 +112,7 @@ export default function CalendarHeatmap({ checkedDays, days = 30 }: Props) {
             <View key={rowIdx} style={styles.row}>
               {row.map((cell, colIdx) => {
                 if (!cell) {
-                  return <View key={`e-${colIdx}`} style={[styles.cell, { width: CELL, height: CELL, marginRight: GAP, marginBottom: GAP, backgroundColor: 'transparent' }]} />;
+                  return <View key={`e-${rowIdx}-${colIdx}`} style={[styles.cell, { width: CELL, height: CELL, marginRight: GAP, marginBottom: GAP, backgroundColor: 'transparent' }]} />;
                 }
                 const checked = checkedDays.has(cell.key);
                 const isToday = cell.key === todayStr;

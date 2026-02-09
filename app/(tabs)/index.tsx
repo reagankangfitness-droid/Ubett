@@ -19,6 +19,7 @@ export default function CheckScreen() {
     checked,
     allChecked,
     checkedCount,
+    activeItemCount,
     loading,
     toggle,
     addItem,
@@ -45,14 +46,9 @@ export default function CheckScreen() {
   }
 
   const handleToggle = (id: string) => {
-    // Check if this toggle will complete the list *before* toggling
-    const willComplete = items.every((i) =>
-      i.id === id ? !checked.has(id) : checked.has(i.id),
-    );
+    const completed = toggle(id);
 
-    toggle(id);
-
-    if (willComplete) {
+    if (completed) {
       streak.recordCheck();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -139,13 +135,13 @@ export default function CheckScreen() {
                 style={[
                   styles.progressFill,
                   {
-                    width: `${items.length > 0 ? (checkedCount / items.length) * 100 : 0}%` as `${number}%`,
+                    width: `${activeItemCount > 0 ? (checkedCount / activeItemCount) * 100 : 0}%` as `${number}%`,
                   },
                 ]}
               />
             </View>
             <Text style={styles.progressText}>
-              {checkedCount}/{items.length}
+              {checkedCount}/{activeItemCount}
             </Text>
           </View>
         )}
