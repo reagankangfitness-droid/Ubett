@@ -1,10 +1,10 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/constants/theme';
 
-export default function CheckScreen() {
+export default function StreaksScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>DoorCheck</Text>
+      <Text style={styles.title}>Streaks</Text>
     </View>
   );
 }
