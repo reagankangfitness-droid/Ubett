@@ -46,6 +46,7 @@ export async function setupNotificationChannel(): Promise<void> {
 
 /** Register notification categories with interactive actions. */
 export async function setupNotificationCategories(): Promise<void> {
+  if (Platform.OS === 'web') return;
   await Notifications.setNotificationCategoryAsync('DEPARTURE_CHECK', [
     {
       identifier: 'open_check',
