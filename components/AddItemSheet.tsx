@@ -9,7 +9,9 @@ import {
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { colors } from '@/constants/theme';
+import { usePro } from '@/contexts/ProContext';
 import { FREE_TIER_LIMIT, type LocalCheckItem, type TimeRule } from '@/hooks/useChecklist';
 import BottomSheet from './BottomSheet';
 
@@ -42,6 +44,7 @@ export default function AddItemSheet({
   const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [startTime, setStartTime] = useState('07:00');
   const [endTime, setEndTime] = useState('09:00');
+  const { isPro } = usePro();
 
   // Reset form when opened / populate when editing
   useEffect(() => {
@@ -72,7 +75,7 @@ export default function AddItemSheet({
   }, [visible, editingItem]);
 
   const isEditing = !!editingItem;
-  const atLimit = !isEditing && currentItemCount >= FREE_TIER_LIMIT;
+  const atLimit = !isPro && !isEditing && currentItemCount >= FREE_TIER_LIMIT;
 
   const toggleDay = (day: number) => {
     setDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
@@ -88,6 +91,10 @@ export default function AddItemSheet({
       Alert.alert(
         'Free tier limit',
         `You can have up to ${FREE_TIER_LIMIT} items on the free plan. Upgrade to add more!`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => { onClose(); router.push('/upgrade'); } },
+        ],
       );
       return;
     }

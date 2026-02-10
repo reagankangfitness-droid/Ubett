@@ -12,7 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, SlideInLeft, LinearTransition } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
+import { router } from 'expo-router';
 import { colors } from '@/constants/theme';
+import { usePro } from '@/contexts/ProContext';
 import { useChecklist, type LocalCheckItem, type TimeRule } from '@/hooks/useChecklist';
 import { useStreak } from '@/hooks/useStreak';
 import { cancelStreakReminder } from '@/lib/notifications';
@@ -43,6 +45,7 @@ export default function CheckScreen() {
   } = useChecklist();
 
   const streak = useStreak();
+  const { isPro } = usePro();
 
   // Sheet state
   const [addSheetOpen, setAddSheetOpen] = useState(false);
@@ -72,6 +75,24 @@ export default function CheckScreen() {
     }
     prevStreak.current = curr;
   }, [streak.currentStreak]);
+
+  // 7-day PRO nudge
+  const nudgeShown = useRef(false);
+  useEffect(() => {
+    if (!isPro && !nudgeShown.current && streak.totalChecks === 7) {
+      nudgeShown.current = true;
+      setTimeout(() => {
+        Alert.alert(
+          'Loving DoorCheck?',
+          'Upgrade to PRO for unlimited items, multiple locations, and more!',
+          [
+            { text: 'Maybe Later', style: 'cancel' },
+            { text: 'See PRO', onPress: () => router.push('/upgrade') },
+          ],
+        );
+      }, 800);
+    }
+  }, [isPro, streak.totalChecks]);
 
   if (loading || streak.loading) {
     return (

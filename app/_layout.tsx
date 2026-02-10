@@ -16,6 +16,7 @@ import {
   setupNotificationCategories,
   scheduleStreakReminder,
 } from '@/lib/notifications';
+import { ProProvider } from '@/contexts/ProContext';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -88,12 +89,18 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="onboarding"
-        options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}
-      />
-    </Stack>
+    <ProProvider>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="onboarding"
+          options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}
+        />
+        <Stack.Screen
+          name="upgrade"
+          options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+      </Stack>
+    </ProProvider>
   );
 }

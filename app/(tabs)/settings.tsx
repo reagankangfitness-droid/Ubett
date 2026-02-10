@@ -15,7 +15,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 
+import { router } from 'expo-router';
 import { colors } from '@/constants/theme';
+import { usePro } from '@/contexts/ProContext';
 import { useDepartureTrigger } from '@/hooks/useDepartureTrigger';
 import { requestNotificationPermissions, scheduleStreakReminder, cancelStreakReminder } from '@/lib/notifications';
 import {
@@ -68,6 +70,7 @@ type PickerKind = 'activeStart' | 'activeEnd' | 'cooldown' | 'radius' | 'quietSt
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const { isPro } = usePro();
   const { settings, loading, wifiConnected, updateSettings, detectWifi } = useDepartureTrigger();
   const { resetChecks } = useChecklist();
   const [ssidInput, setSsidInput] = useState('');
@@ -288,7 +291,7 @@ export default function SettingsScreen() {
   // ── PRO handler ───────────────────────────────────────────────
 
   const handleUpgrade = () => {
-    Alert.alert('Coming Soon', 'DoorCheck PRO will be available soon!');
+    router.push('/upgrade');
   };
 
   // ── Format helpers ────────────────────────────────────────────
@@ -571,22 +574,26 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── DoorCheck PRO ──────────────────────────── */}
-        <Text style={styles.sectionTitle}>DOORCHECK PRO</Text>
-        <View style={styles.proCard}>
-          <Text style={styles.proTitle}>Unlock DoorCheck PRO</Text>
-          <View style={styles.proBenefits}>
-            {PRO_BENEFITS.map((benefit) => (
-              <View key={benefit} style={styles.proBenefitRow}>
-                <Text style={styles.proCheck}>{'\u2713'}</Text>
-                <Text style={styles.proBenefitText}>{benefit}</Text>
+        {!isPro && (
+          <>
+            <Text style={styles.sectionTitle}>DOORCHECK PRO</Text>
+            <View style={styles.proCard}>
+              <Text style={styles.proTitle}>Unlock DoorCheck PRO</Text>
+              <View style={styles.proBenefits}>
+                {PRO_BENEFITS.map((benefit) => (
+                  <View key={benefit} style={styles.proBenefitRow}>
+                    <Text style={styles.proCheck}>{'\u2713'}</Text>
+                    <Text style={styles.proBenefitText}>{benefit}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-          <Text style={styles.proPricing}>$3.99/mo or $29.99/year</Text>
-          <Pressable style={styles.proBtn} onPress={handleUpgrade}>
-            <Text style={styles.proBtnText}>Upgrade</Text>
-          </Pressable>
-        </View>
+              <Text style={styles.proPricing}>$3.99/mo or $29.99/year</Text>
+              <Pressable style={styles.proBtn} onPress={handleUpgrade}>
+                <Text style={styles.proBtnText}>Upgrade</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* ── Option picker sheet ─────────────────────── */}
