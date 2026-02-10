@@ -57,7 +57,15 @@
           "icon": "./assets/images/icon.png",
           "color": "#E85D26"
         }
-      ]
+      ],
+      [
+        "expo-background-fetch",
+        {
+          "stopOnTerminate": false,
+          "startOnBoot": true
+        }
+      ],
+      "expo-task-manager"
     ],
     "experiments": {
       "typedRoutes": true

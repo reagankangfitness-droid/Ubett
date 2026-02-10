@@ -5,6 +5,10 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
+// Register background task (must be at module level)
+import '@/lib/backgroundTask';
+import { requestNotificationPermissions, setupNotificationChannel } from '@/lib/notifications';
+
 export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
@@ -27,6 +31,14 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  // Initialize notifications on startup
+  useEffect(() => {
+    (async () => {
+      await setupNotificationChannel();
+      await requestNotificationPermissions();
+    })();
+  }, []);
 
   if (!loaded) {
     return null;
