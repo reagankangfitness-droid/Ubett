@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Switch,
   Text,
@@ -10,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 
 import { colors } from '@/constants/theme';
 import { useDepartureTrigger } from '@/hooks/useDepartureTrigger';
@@ -28,6 +32,8 @@ import {
   getCurrentLocation,
   getAddressFromCoords,
 } from '@/lib/locationPermissions';
+
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => {
   const value = `${String(h).padStart(2, '0')}:00`;
@@ -50,11 +56,19 @@ const RADIUS_OPTIONS = [
   { value: 500, label: '500 m' },
 ];
 
+const PRO_BENEFITS = [
+  'Unlimited items (free: max 6)',
+  'Multiple locations',
+  'Accountability buddy',
+  'Return home check',
+  'Widgets',
+];
+
 type PickerKind = 'activeStart' | 'activeEnd' | 'cooldown' | 'radius' | 'quietStart' | 'quietEnd' | null;
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { settings, loading, wifiConnected, updateSettings, detectWifi, geofenceActive } = useDepartureTrigger();
+  const { settings, loading, wifiConnected, updateSettings, detectWifi } = useDepartureTrigger();
   const { resetChecks } = useChecklist();
   const [ssidInput, setSsidInput] = useState('');
   const [pickerOpen, setPickerOpen] = useState<PickerKind>(null);
@@ -68,7 +82,6 @@ export default function SettingsScreen() {
     }
   }, [loading, settings.homeSSID]);
 
-  // Load notification settings
   useEffect(() => {
     (async () => {
       const ns = await loadNotificationSettings();
@@ -83,6 +96,8 @@ export default function SettingsScreen() {
       </View>
     );
   }
+
+  // ── Departure trigger handlers ────────────────────────────────
 
   const handleToggleEnabled = async (value: boolean) => {
     if (value) {
@@ -108,25 +123,93 @@ export default function SettingsScreen() {
   const handleDetectWifi = async () => {
     const onWifi = await detectWifi();
     if (onWifi) {
-      Alert.alert(
-        'WiFi Detected',
-        'You are connected to WiFi. Set this as your home network?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Set as Home',
-            onPress: () => {
-              const label = 'Current WiFi';
-              setSsidInput(label);
-              updateSettings({ ...settings, homeSSID: label });
-            },
+      Alert.alert('WiFi Detected', 'You are connected to WiFi. Set this as your home network?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Set as Home',
+          onPress: () => {
+            const label = 'Current WiFi';
+            setSsidInput(label);
+            updateSettings({ ...settings, homeSSID: label });
           },
-        ],
-      );
+        },
+      ]);
     } else {
       Alert.alert('Not on WiFi', 'Connect to your home WiFi first, then try again.');
     }
   };
+
+  const handleToggleGeofence = async (value: boolean) => {
+    if (!value) {
+      await updateSettings({ ...settings, geofenceEnabled: false });
+      return;
+    }
+    const fg = await requestForegroundLocation();
+    if (!fg.granted) {
+      Alert.alert('Location Required', 'Please enable location access in Settings to use geofencing.');
+      return;
+    }
+    setLocationExplanationVisible(true);
+  };
+
+  const handleLocationExplanationContinue = async () => {
+    setLocationExplanationVisible(false);
+    const bg = await requestBackgroundLocation();
+    if (!bg.granted) {
+      Alert.alert(
+        'Background Location Required',
+        'DoorCheck needs "Always Allow" location access for geofencing to work when the app is closed.',
+      );
+      return;
+    }
+    await updateSettings({ ...settings, geofenceEnabled: true });
+  };
+
+  const handleSetHomeLocation = async () => {
+    setSettingLocation(true);
+    try {
+      const fg = await requestForegroundLocation();
+      if (!fg.granted) {
+        Alert.alert('Location Required', 'Please enable location access to set your home position.');
+        return;
+      }
+      const coords = await getCurrentLocation();
+      if (!coords) {
+        Alert.alert('Location Error', 'Could not determine your current location. Please try again.');
+        return;
+      }
+      const address = await getAddressFromCoords(coords.latitude, coords.longitude);
+      const displayText = address ?? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+      Alert.alert('Set Home Location', `Use this as your home?\n\n${displayText}`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: () =>
+            updateSettings({
+              ...settings,
+              homeLatitude: coords.latitude,
+              homeLongitude: coords.longitude,
+            }),
+        },
+      ]);
+    } finally {
+      setSettingLocation(false);
+    }
+  };
+
+  // ── Notification handlers ─────────────────────────────────────
+
+  const updateNotifSettings = async (next: NotificationSettings) => {
+    setNotifSettings(next);
+    await saveNotificationSettings(next);
+    if (next.streakReminders) {
+      await scheduleStreakReminder();
+    } else {
+      await cancelStreakReminder();
+    }
+  };
+
+  // ── Picker handler ────────────────────────────────────────────
 
   const handlePickerSelect = (kind: PickerKind, value: string | number) => {
     if (kind === 'activeStart') {
@@ -145,6 +228,8 @@ export default function SettingsScreen() {
     setPickerOpen(null);
   };
 
+  // ── Account handlers ──────────────────────────────────────────
+
   const handleResetChecks = () => {
     Alert.alert('Reset Checks', 'Uncheck all items for today?', [
       { text: 'Cancel', style: 'cancel' },
@@ -152,88 +237,61 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const handleToggleGeofence = async (value: boolean) => {
-    if (!value) {
-      await updateSettings({ ...settings, geofenceEnabled: false });
-      return;
-    }
-
-    // Request foreground permission first
-    const fg = await requestForegroundLocation();
-    if (!fg.granted) {
-      Alert.alert('Location Required', 'Please enable location access in Settings to use geofencing.');
-      return;
-    }
-
-    // Show explanation before requesting background permission
-    setLocationExplanationVisible(true);
+  const handleSignIn = () => {
+    Alert.alert('Coming Soon', 'Email sign-in will be available in a future update.');
   };
 
-  const handleLocationExplanationContinue = async () => {
-    setLocationExplanationVisible(false);
-
-    const bg = await requestBackgroundLocation();
-    if (!bg.granted) {
-      Alert.alert(
-        'Background Location Required',
-        'DoorCheck needs "Always Allow" location access for geofencing to work when the app is closed.',
-      );
-      return;
-    }
-
-    await updateSettings({ ...settings, geofenceEnabled: true });
+  const handleExportData = () => {
+    Alert.alert('Coming Soon', 'Data export will be available in a future update.');
   };
 
-  const handleSetHomeLocation = async () => {
-    setSettingLocation(true);
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete all your data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => Alert.alert('Coming Soon', 'Account deletion will be available in a future update.'),
+        },
+      ],
+    );
+  };
+
+  // ── About handlers ────────────────────────────────────────────
+
+  const handleRateApp = () => {
+    const url = Platform.select({
+      ios: 'https://apps.apple.com/app/doorcheck/id000000000',
+      android: 'https://play.google.com/store/apps/details?id=com.doorcheck.app',
+      default: 'https://doorcheck.app',
+    });
+    Linking.openURL(url);
+  };
+
+  const handleShare = async () => {
     try {
-      const fg = await requestForegroundLocation();
-      if (!fg.granted) {
-        Alert.alert('Location Required', 'Please enable location access to set your home position.');
-        return;
-      }
-
-      const coords = await getCurrentLocation();
-      if (!coords) {
-        Alert.alert('Location Error', 'Could not determine your current location. Please try again.');
-        return;
-      }
-
-      const address = await getAddressFromCoords(coords.latitude, coords.longitude);
-      const displayText = address ?? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
-
-      Alert.alert(
-        'Set Home Location',
-        `Use this as your home?\n\n${displayText}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Confirm',
-            onPress: () =>
-              updateSettings({
-                ...settings,
-                homeLatitude: coords.latitude,
-                homeLongitude: coords.longitude,
-              }),
-          },
-        ],
-      );
-    } finally {
-      setSettingLocation(false);
+      await Share.share({
+        message: 'Check out DoorCheck — never forget your essentials when leaving home! https://doorcheck.app',
+      });
+    } catch {
+      // User cancelled share
     }
   };
 
-  const updateNotifSettings = async (next: NotificationSettings) => {
-    setNotifSettings(next);
-    await saveNotificationSettings(next);
+  const handleContactSupport = () => Linking.openURL('mailto:support@doorcheck.app');
+  const handlePrivacyPolicy = () => Linking.openURL('https://doorcheck.app/privacy');
+  const handleTerms = () => Linking.openURL('https://doorcheck.app/terms');
 
-    // Sync streak reminder
-    if (next.streakReminders) {
-      await scheduleStreakReminder();
-    } else {
-      await cancelStreakReminder();
-    }
+  // ── PRO handler ───────────────────────────────────────────────
+
+  const handleUpgrade = () => {
+    Alert.alert('Coming Soon', 'DoorCheck PRO will be available soon!');
   };
+
+  // ── Format helpers ────────────────────────────────────────────
 
   const formatTime = (time: string) => {
     const [h] = time.split(':').map(Number);
@@ -243,59 +301,73 @@ export default function SettingsScreen() {
     return `${h - 12} PM`;
   };
 
-  const formatCooldown = (mins: number) => {
-    const opt = COOLDOWN_OPTIONS.find((o) => o.value === mins);
-    return opt?.label ?? `${mins} min`;
-  };
+  const formatCooldown = (mins: number) =>
+    COOLDOWN_OPTIONS.find((o) => o.value === mins)?.label ?? `${mins} min`;
 
-  const formatRadius = (meters: number) => {
-    const opt = RADIUS_OPTIONS.find((o) => o.value === meters);
-    return opt?.label ?? `${meters} m`;
-  };
+  const formatRadius = (meters: number) =>
+    RADIUS_OPTIONS.find((o) => o.value === meters)?.label ?? `${meters} m`;
 
   const formatCoords = (lat: number | null, lng: number | null) => {
     if (lat == null || lng == null) return 'Not set';
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   };
 
+  const pickerTitle = (() => {
+    switch (pickerOpen) {
+      case 'activeStart': return 'Active From';
+      case 'activeEnd': return 'Active Until';
+      case 'cooldown': return 'Cooldown';
+      case 'radius': return 'Detection Radius';
+      case 'quietStart': return 'Quiet Hours Start';
+      case 'quietEnd': return 'Quiet Hours End';
+      default: return '';
+    }
+  })();
+
+  const pickerCurrentHour = (() => {
+    switch (pickerOpen) {
+      case 'activeStart': return settings.activeStart;
+      case 'activeEnd': return settings.activeEnd;
+      case 'quietStart': return notifSettings.quietHoursStart;
+      case 'quietEnd': return notifSettings.quietHoursEnd;
+      default: return '';
+    }
+  })();
+
+  // ── Render ────────────────────────────────────────────────────
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <Text style={styles.screenTitle}>Settings</Text>
 
-        {/* ── Departure Trigger Section ─────────────── */}
-        <Text style={styles.sectionTitle}>DEPARTURE REMINDER</Text>
+        {/* ── Departure Trigger ──────────────────────── */}
+        <Text style={styles.sectionTitle}>DEPARTURE TRIGGER</Text>
         <View style={styles.card}>
-          {/* Enable toggle */}
           <View style={styles.row}>
             <View style={styles.rowTextCol}>
-              <Text style={styles.rowLabel}>Enable</Text>
+              <Text style={styles.rowLabel}>Trigger Enabled</Text>
               <Text style={styles.rowHint}>Get notified when you leave home</Text>
             </View>
             <Switch
               value={settings.enabled}
               onValueChange={handleToggleEnabled}
-              trackColor={{ false: colors.border, true: colors.green }}
+              trackColor={{ false: colors.border, true: colors.orange }}
               thumbColor="#FFFFFF"
             />
           </View>
 
           <View style={styles.divider} />
 
-          {/* WiFi status */}
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>WiFi Status</Text>
-            <Text style={[styles.rowValue, { color: wifiConnected ? colors.green : colors.inkSoft }]}>
-              {wifiConnected === null ? '...' : wifiConnected ? 'Connected' : 'Disconnected'}
-            </Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Home SSID */}
-          <View style={styles.ssidRow}>
-            <Text style={styles.rowLabel}>Home WiFi Name</Text>
-            <View style={styles.ssidInputRow}>
+          {/* Home WiFi */}
+          <View style={styles.compactRow}>
+            <View style={styles.compactRowHeader}>
+              <Text style={styles.rowLabel}>Home WiFi</Text>
+              <Text style={[styles.statusDot, { color: wifiConnected ? colors.green : colors.border }]}>
+                {wifiConnected ? 'Connected' : wifiConnected === null ? '' : 'Disconnected'}
+              </Text>
+            </View>
+            <View style={styles.inlineInputRow}>
               <TextInput
                 style={styles.ssidInput}
                 value={ssidInput}
@@ -306,15 +378,58 @@ export default function SettingsScreen() {
                 returnKeyType="done"
                 onSubmitEditing={handleSaveSSID}
               />
-              <Pressable style={styles.detectBtn} onPress={handleDetectWifi}>
-                <Text style={styles.detectBtnText}>Detect</Text>
+              <Pressable style={styles.smallBtn} onPress={handleDetectWifi}>
+                <Text style={styles.smallBtnText}>Detect</Text>
               </Pressable>
             </View>
           </View>
 
           <View style={styles.divider} />
 
-          {/* Active hours */}
+          {/* Home Location (geofence) */}
+          <View style={styles.row}>
+            <View style={styles.rowTextCol}>
+              <Text style={styles.rowLabel}>Home Location</Text>
+              <Text style={styles.rowHint}>Geofence backup via GPS</Text>
+            </View>
+            <Switch
+              value={settings.geofenceEnabled}
+              onValueChange={handleToggleGeofence}
+              disabled={!settings.enabled}
+              trackColor={{ false: colors.border, true: colors.orange }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {settings.geofenceEnabled && (
+            <>
+              <View style={styles.locationMeta}>
+                <Text style={[styles.rowValue, { flex: 1 }]}>
+                  {formatCoords(settings.homeLatitude, settings.homeLongitude)}
+                </Text>
+                <Pressable
+                  style={[styles.smallBtn, settingLocation && { opacity: 0.5 }]}
+                  onPress={handleSetHomeLocation}
+                  disabled={settingLocation}
+                >
+                  <Text style={styles.smallBtnText}>
+                    {settingLocation ? 'Locating...' : 'Set Location'}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.divider} />
+
+              <Pressable style={styles.row} onPress={() => setPickerOpen('radius')}>
+                <Text style={styles.rowLabel}>Detection Radius</Text>
+                <Text style={styles.rowValue}>{formatRadius(settings.homeRadiusMeters)}</Text>
+              </Pressable>
+            </>
+          )}
+
+          {!settings.geofenceEnabled && <View style={styles.divider} />}
+
+          {/* Active Hours */}
           <Pressable style={styles.row} onPress={() => setPickerOpen('activeStart')}>
             <Text style={styles.rowLabel}>Active From</Text>
             <Text style={styles.rowValue}>{formatTime(settings.activeStart)}</Text>
@@ -336,94 +451,39 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {/* ── Geofence Backup Section ───────────────── */}
-        <Text style={styles.sectionTitle}>GEOFENCE BACKUP</Text>
-        <View style={styles.card}>
-          {/* Geofence toggle */}
-          <View style={styles.row}>
-            <View style={styles.rowTextCol}>
-              <Text style={styles.rowLabel}>Geofence</Text>
-              <Text style={styles.rowHint}>Backup departure detection via GPS</Text>
-            </View>
-            <Switch
-              value={settings.geofenceEnabled}
-              onValueChange={handleToggleGeofence}
-              disabled={!settings.enabled}
-              trackColor={{ false: colors.border, true: colors.green }}
-              thumbColor="#FFFFFF"
-            />
-          </View>
-
-          {settings.geofenceEnabled && (
-            <>
-              <View style={styles.divider} />
-
-              {/* Home location */}
-              <View style={styles.ssidRow}>
-                <Text style={styles.rowLabel}>Home Location</Text>
-                <View style={styles.ssidInputRow}>
-                  <Text style={[styles.rowValue, { flex: 1 }]}>
-                    {formatCoords(settings.homeLatitude, settings.homeLongitude)}
-                  </Text>
-                  <Pressable
-                    style={[styles.detectBtn, settingLocation && { opacity: 0.5 }]}
-                    onPress={handleSetHomeLocation}
-                    disabled={settingLocation}
-                  >
-                    <Text style={styles.detectBtnText}>
-                      {settingLocation ? 'Locating...' : 'Use Current Location'}
-                    </Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Detection radius */}
-              <Pressable style={styles.row} onPress={() => setPickerOpen('radius')}>
-                <Text style={styles.rowLabel}>Detection Radius</Text>
-                <Text style={styles.rowValue}>{formatRadius(settings.homeRadiusMeters)}</Text>
-              </Pressable>
-            </>
-          )}
-        </View>
-
-        {/* ── Notifications Section ──────────────────── */}
+        {/* ── Notifications ──────────────────────────── */}
         <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
         <View style={styles.card}>
-          {/* Departure notifications toggle */}
           <View style={styles.row}>
             <View style={styles.rowTextCol}>
-              <Text style={styles.rowLabel}>Departure Notifications</Text>
-              <Text style={styles.rowHint}>Get notified when leaving home</Text>
+              <Text style={styles.rowLabel}>Departure Alerts</Text>
+              <Text style={styles.rowHint}>Notify when leaving home</Text>
             </View>
             <Switch
               value={notifSettings.departureNotifications}
               onValueChange={(v) => updateNotifSettings({ ...notifSettings, departureNotifications: v })}
-              trackColor={{ false: colors.border, true: colors.green }}
+              trackColor={{ false: colors.border, true: colors.orange }}
               thumbColor="#FFFFFF"
             />
           </View>
 
           <View style={styles.divider} />
 
-          {/* Streak reminders toggle */}
           <View style={styles.row}>
             <View style={styles.rowTextCol}>
               <Text style={styles.rowLabel}>Streak Reminders</Text>
-              <Text style={styles.rowHint}>Remind to check before 8 PM</Text>
+              <Text style={styles.rowHint}>Daily reminder at 8 PM</Text>
             </View>
             <Switch
               value={notifSettings.streakReminders}
               onValueChange={(v) => updateNotifSettings({ ...notifSettings, streakReminders: v })}
-              trackColor={{ false: colors.border, true: colors.green }}
+              trackColor={{ false: colors.border, true: colors.orange }}
               thumbColor="#FFFFFF"
             />
           </View>
 
           <View style={styles.divider} />
 
-          {/* Quiet hours */}
           <Pressable style={styles.row} onPress={() => setPickerOpen('quietStart')}>
             <Text style={styles.rowLabel}>Quiet Hours Start</Text>
             <Text style={styles.rowValue}>{formatTime(notifSettings.quietHoursStart)}</Text>
@@ -437,39 +497,101 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {/* ── General Section ─────────────────────────── */}
-        <Text style={styles.sectionTitle}>GENERAL</Text>
+        {/* ── Account ────────────────────────────────── */}
+        <Text style={styles.sectionTitle}>ACCOUNT</Text>
         <View style={styles.card}>
+          <Pressable style={styles.row} onPress={handleSignIn}>
+            <Text style={styles.rowLabel}>Sign In with Email</Text>
+            <Text style={styles.chevron}>{'\u203A'}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable style={styles.row} onPress={handleExportData}>
+            <Text style={styles.rowLabel}>Export Data</Text>
+            <Text style={styles.chevron}>{'\u203A'}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+
           <Pressable style={styles.row} onPress={handleResetChecks}>
             <Text style={styles.rowLabel}>Reset Today's Checks</Text>
             <Text style={[styles.rowValue, { color: colors.orange }]}>Reset</Text>
           </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable style={styles.row} onPress={handleDeleteAccount}>
+            <Text style={[styles.rowLabel, { color: '#C0392B' }]}>Delete Account</Text>
+          </Pressable>
         </View>
 
-        <Text style={styles.footnote}>
-          Departure detection monitors your WiFi connection. When you disconnect from WiFi during
-          active hours, you'll receive a reminder after a 30-second delay.
-          {settings.geofenceEnabled
-            ? ' Geofence backup uses your home location to detect departures when WiFi detection is unavailable. Your location is never tracked or stored beyond your device.'
-            : ''}
-        </Text>
+        {/* ── About ──────────────────────────────────── */}
+        <Text style={styles.sectionTitle}>ABOUT</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Version</Text>
+            <Text style={styles.rowValue}>{APP_VERSION}</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <Pressable style={styles.row} onPress={handleRateApp}>
+            <Text style={styles.rowLabel}>Rate DoorCheck \u2B50</Text>
+            <Text style={styles.chevron}>{'\u203A'}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable style={styles.row} onPress={handleShare}>
+            <Text style={styles.rowLabel}>Share with a Friend</Text>
+            <Text style={styles.chevron}>{'\u203A'}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable style={styles.row} onPress={handleContactSupport}>
+            <Text style={styles.rowLabel}>Contact Support</Text>
+            <Text style={styles.chevron}>{'\u203A'}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable style={styles.row} onPress={handlePrivacyPolicy}>
+            <Text style={styles.rowLabel}>Privacy Policy</Text>
+            <Text style={styles.chevron}>{'\u203A'}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable style={styles.row} onPress={handleTerms}>
+            <Text style={styles.rowLabel}>Terms of Service</Text>
+            <Text style={styles.chevron}>{'\u203A'}</Text>
+          </Pressable>
+        </View>
+
+        {/* ── DoorCheck PRO ──────────────────────────── */}
+        <Text style={styles.sectionTitle}>DOORCHECK PRO</Text>
+        <View style={styles.proCard}>
+          <Text style={styles.proTitle}>Unlock DoorCheck PRO</Text>
+          <View style={styles.proBenefits}>
+            {PRO_BENEFITS.map((benefit) => (
+              <View key={benefit} style={styles.proBenefitRow}>
+                <Text style={styles.proCheck}>{'\u2713'}</Text>
+                <Text style={styles.proBenefitText}>{benefit}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.proPricing}>$3.99/mo or $29.99/year</Text>
+          <Pressable style={styles.proBtn} onPress={handleUpgrade}>
+            <Text style={styles.proBtnText}>Upgrade</Text>
+          </Pressable>
+        </View>
       </ScrollView>
 
       {/* ── Option picker sheet ─────────────────────── */}
       <BottomSheet visible={pickerOpen !== null} onClose={() => setPickerOpen(null)}>
-        <Text style={styles.pickerTitle}>
-          {pickerOpen === 'activeStart'
-            ? 'Active From'
-            : pickerOpen === 'activeEnd'
-              ? 'Active Until'
-              : pickerOpen === 'radius'
-                ? 'Detection Radius'
-                : pickerOpen === 'quietStart'
-                  ? 'Quiet Hours Start'
-                  : pickerOpen === 'quietEnd'
-                    ? 'Quiet Hours End'
-                    : 'Cooldown'}
-        </Text>
+        <Text style={styles.pickerTitle}>{pickerTitle}</Text>
         <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
           {pickerOpen === 'cooldown'
             ? COOLDOWN_OPTIONS.map((opt) => (
@@ -495,29 +617,17 @@ export default function SettingsScreen() {
                     </Text>
                   </Pressable>
                 ))
-              : HOUR_OPTIONS.map((opt) => {
-                  const current =
-                    pickerOpen === 'activeStart'
-                      ? settings.activeStart
-                      : pickerOpen === 'activeEnd'
-                        ? settings.activeEnd
-                        : pickerOpen === 'quietStart'
-                          ? notifSettings.quietHoursStart
-                          : pickerOpen === 'quietEnd'
-                            ? notifSettings.quietHoursEnd
-                            : '';
-                  return (
-                    <Pressable
-                      key={opt.value}
-                      style={[styles.pickerOption, current === opt.value && styles.pickerOptionActive]}
-                      onPress={() => handlePickerSelect(pickerOpen, opt.value)}
-                    >
-                      <Text style={[styles.pickerOptionText, current === opt.value && styles.pickerOptionTextActive]}>
-                        {opt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+              : HOUR_OPTIONS.map((opt) => (
+                  <Pressable
+                    key={opt.value}
+                    style={[styles.pickerOption, pickerCurrentHour === opt.value && styles.pickerOptionActive]}
+                    onPress={() => handlePickerSelect(pickerOpen, opt.value)}
+                  >
+                    <Text style={[styles.pickerOptionText, pickerCurrentHour === opt.value && styles.pickerOptionTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                ))}
         </ScrollView>
       </BottomSheet>
 
@@ -531,10 +641,7 @@ export default function SettingsScreen() {
         <Pressable style={styles.explanationBtn} onPress={handleLocationExplanationContinue}>
           <Text style={styles.explanationBtnText}>Continue</Text>
         </Pressable>
-        <Pressable
-          style={styles.explanationCancelBtn}
-          onPress={() => setLocationExplanationVisible(false)}
-        >
+        <Pressable style={styles.explanationCancelBtn} onPress={() => setLocationExplanationVisible(false)}>
           <Text style={styles.explanationCancelText}>Cancel</Text>
         </Pressable>
       </BottomSheet>
@@ -549,7 +656,7 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: 60,
   },
   loadingText: {
     marginTop: 100,
@@ -614,17 +721,35 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     fontFamily: 'System',
   },
+  chevron: {
+    fontSize: 22,
+    fontWeight: '400',
+    color: colors.border,
+    fontFamily: 'System',
+  },
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border,
   },
-  ssidRow: {
+  statusDot: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'System',
+  },
+
+  // ── Compact / inline rows ─────────────────────────
+  compactRow: {
     paddingVertical: 14,
   },
-  ssidInputRow: {
+  compactRowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  inlineInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   ssidInput: {
@@ -637,25 +762,91 @@ const styles = StyleSheet.create({
     color: colors.ink,
     fontFamily: 'System',
   },
-  detectBtn: {
+  smallBtn: {
     backgroundColor: colors.orange,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  detectBtnText: {
+  smallBtnText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
     fontFamily: 'System',
   },
-  footnote: {
-    fontSize: 13,
-    color: colors.inkSoft,
-    lineHeight: 18,
-    marginHorizontal: 4,
+  locationMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingBottom: 14,
+  },
+
+  // ── PRO card ──────────────────────────────────────
+  proCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: colors.orange,
+    shadowColor: '#1A1612',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  proTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.ink,
+    textAlign: 'center',
+    marginBottom: 16,
     fontFamily: 'System',
   },
+  proBenefits: {
+    marginBottom: 16,
+    gap: 10,
+  },
+  proBenefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  proCheck: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.orange,
+    fontFamily: 'System',
+  },
+  proBenefitText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.ink,
+    fontFamily: 'System',
+  },
+  proPricing: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.inkSoft,
+    textAlign: 'center',
+    marginBottom: 16,
+    fontFamily: 'System',
+  },
+  proBtn: {
+    backgroundColor: colors.orange,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  proBtnText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+    fontFamily: 'System',
+  },
+
+  // ── Picker sheet ──────────────────────────────────
   pickerTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -687,6 +878,8 @@ const styles = StyleSheet.create({
     color: colors.orange,
     fontWeight: '700',
   },
+
+  // ── Explanation sheet ─────────────────────────────
   explanationText: {
     fontSize: 15,
     color: colors.inkSoft,
