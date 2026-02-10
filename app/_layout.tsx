@@ -4,7 +4,7 @@ import { Stack, router } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 // Register background tasks (must be at module level)
@@ -29,26 +29,36 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     ...FontAwesome.font,
   });
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
+  // Check onboarding status, setup notifications, then reveal app
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+    if (!loaded) return;
 
-  // Initialize notifications on startup
-  useEffect(() => {
     (async () => {
+      // Always safe to setup channels/categories
       await setupNotificationChannel();
       await setupNotificationCategories();
-      await requestNotificationPermissions();
-      await scheduleStreakReminder();
+
+      const done = await AsyncStorage.getItem('doorcheck_onboarding_complete');
+
+      if (done === 'true') {
+        // Returning user — normal startup
+        await requestNotificationPermissions();
+        await scheduleStreakReminder();
+      } else {
+        // First launch — send to onboarding
+        router.replace('/onboarding');
+      }
+
+      setIsReady(true);
+      await SplashScreen.hideAsync();
     })();
-  }, []);
+  }, [loaded]);
 
   // Handle notification taps
   useEffect(() => {
@@ -80,6 +90,10 @@ export default function RootLayout() {
   return (
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="onboarding"
+        options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }}
+      />
     </Stack>
   );
 }
