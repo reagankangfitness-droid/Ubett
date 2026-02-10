@@ -6,10 +6,10 @@ import Purchases, {
 } from 'react-native-purchases';
 import { Platform } from 'react-native';
 
-// ── Replace with your RevenueCat API keys ─────────────────────────
+// ── RevenueCat API keys from environment ──────────────────────────
 const API_KEY = Platform.select({
-  ios: 'appl_YOUR_REVENUECAT_IOS_API_KEY',
-  android: 'goog_YOUR_REVENUECAT_ANDROID_API_KEY',
+  ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '',
+  android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '',
   default: '',
 })!;
 
@@ -19,6 +19,10 @@ let initialized = false;
 
 export async function initPurchases(): Promise<void> {
   if (initialized) return;
+  if (!API_KEY) {
+    console.warn('[purchases] RevenueCat API key is missing — skipping Purchases.configure');
+    return;
+  }
   Purchases.setLogLevel(LOG_LEVEL.DEBUG);
   await Purchases.configure({ apiKey: API_KEY });
   initialized = true;

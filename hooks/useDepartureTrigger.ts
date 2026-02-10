@@ -23,8 +23,15 @@ export function useDepartureTrigger() {
 
   const wasOnWifi = useRef(false);
   const disconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMounted = useRef(true);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  // Track component mount status
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
 
   // ── Load settings on mount ──────────────────────────────────
   useEffect(() => {
@@ -87,6 +94,7 @@ export function useDepartureTrigger() {
           // Just lost WiFi → start 30 s debounce
           disconnectTimer.current = setTimeout(async () => {
             disconnectTimer.current = null;
+            if (!isMounted.current) return;
             const s = settingsRef.current;
 
             if (!s.enabled) return;
@@ -121,7 +129,7 @@ export function useDepartureTrigger() {
         disconnectTimer.current = null;
       }
     };
-  }, [settings.enabled]);
+  }, [settings.enabled, settings.cooldownMinutes, settings.activeStart, settings.activeEnd]);
 
   // ── Auto-detect current WiFi state for display ──────────────
   const detectWifi = useCallback(async (): Promise<boolean> => {

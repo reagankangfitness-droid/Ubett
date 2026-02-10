@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = 'doorcheck_streak';
@@ -55,10 +55,13 @@ export function useStreak() {
     })();
   }, []);
 
-  // ── Persist helper ────────────────────────────────────────
-  const persist = useCallback((next: StreakData) => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }, []);
+  // ── Persist whenever data changes (after React commits state) ──
+  useEffect(() => {
+    if (!initialized.current) return;
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data)).catch((err) =>
+      console.warn('[useStreak] persist failed:', err),
+    );
+  }, [data]);
 
   // ── Record a successful check for today ───────────────────
   const recordCheck = useCallback(() => {
@@ -77,21 +80,18 @@ export function useStreak() {
       const days = new Set(prev.checkedDays);
       days.add(today);
 
-      const next: StreakData = {
+      return {
         currentStreak: newCurrent,
         longestStreak: newLongest,
         lastCheckDate: today,
         totalChecks: days.size,
         checkedDays: [...days],
       };
-
-      persist(next);
-      return next;
     });
-  }, [persist]);
+  }, []);
 
   // ── Derived: Set of checked days for fast lookup ──────────
-  const checkedDaysSet = new Set(data.checkedDays);
+  const checkedDaysSet = useMemo(() => new Set(data.checkedDays), [data.checkedDays]);
 
   return {
     currentStreak: data.currentStreak,

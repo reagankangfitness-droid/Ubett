@@ -20,6 +20,7 @@ Notifications.setNotificationHandler({
 
 /** Request notification permissions and return the granted status. */
 export async function requestNotificationPermissions(): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === 'granted') return true;
 
@@ -61,6 +62,12 @@ export async function setupNotificationCategories(): Promise<void> {
  * Respects notification settings (departure toggle + quiet hours).
  */
 export async function scheduleDepartureNotification(): Promise<void> {
+  if (Platform.OS === 'web') return;
+
+  // Check permission before scheduling
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return;
+
   try {
     const settings = await loadNotificationSettings();
     if (!settings.departureNotifications) return;
@@ -87,9 +94,15 @@ export async function scheduleDepartureNotification(): Promise<void> {
  * PRO feature — returns false for free users (caller should show upgrade prompt).
  */
 export async function scheduleReturnNotification(): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
+
   // PRO feature — always returns false until subscription is implemented
   const isPro = false;
   if (!isPro) return false;
+
+  // Check permission before scheduling
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return false;
 
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -109,6 +122,7 @@ export async function scheduleReturnNotification(): Promise<boolean> {
  * Skips if: reminders disabled, past 8 PM, or today's checks already complete.
  */
 export async function scheduleStreakReminder(): Promise<void> {
+  if (Platform.OS === 'web') return;
   try {
     const settings = await loadNotificationSettings();
     if (!settings.streakReminders) return;
@@ -145,6 +159,7 @@ export async function scheduleStreakReminder(): Promise<void> {
 
 /** Cancel a pending streak reminder notification. */
 export async function cancelStreakReminder(): Promise<void> {
+  if (Platform.OS === 'web') return;
   try {
     const id = await AsyncStorage.getItem(STREAK_NOTIF_ID_KEY);
     if (id) {

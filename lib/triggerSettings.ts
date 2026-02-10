@@ -51,11 +51,25 @@ export async function saveTriggerSettings(settings: TriggerSettings): Promise<vo
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
 
+/**
+ * Parse a "HH:mm" time string into [hours, minutes].
+ * Returns [0, 0] if the format is invalid.
+ */
+export function parseTime(str: string): [number, number] {
+  if (typeof str !== 'string') return [0, 0];
+  const match = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return [0, 0];
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (h < 0 || h > 23 || m < 0 || m > 59) return [0, 0];
+  return [h, m];
+}
+
 /** Returns true if the current time falls within the active window. */
 export function isWithinActiveHours(start: string, end: string): boolean {
   const now = new Date();
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
+  const [sh, sm] = parseTime(start);
+  const [eh, em] = parseTime(end);
   const mins = now.getHours() * 60 + now.getMinutes();
   const startMins = sh * 60 + sm;
   const endMins = eh * 60 + em;

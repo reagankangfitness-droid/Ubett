@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Alert,
   Pressable,
@@ -44,11 +44,44 @@ export default function AddItemSheet({
   const [days, setDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [startTime, setStartTime] = useState('07:00');
   const [endTime, setEndTime] = useState('09:00');
+  const [timeError, setTimeError] = useState<string | null>(null);
   const { isPro } = usePro();
+
+  /** Validate and auto-correct an "HH:mm" time string. */
+  const isValidTime = useCallback((value: string): boolean => {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  }, []);
+
+  const handleStartTimeChange = useCallback((value: string) => {
+    setStartTime(value);
+    if (value.length === 5) {
+      if (!isValidTime(value)) {
+        setTimeError('Start time must be HH:mm (00:00 - 23:59)');
+      } else {
+        setTimeError((prev) => (prev?.startsWith('Start') ? null : prev));
+      }
+    } else {
+      setTimeError((prev) => (prev?.startsWith('Start') ? null : prev));
+    }
+  }, [isValidTime]);
+
+  const handleEndTimeChange = useCallback((value: string) => {
+    setEndTime(value);
+    if (value.length === 5) {
+      if (!isValidTime(value)) {
+        setTimeError('End time must be HH:mm (00:00 - 23:59)');
+      } else {
+        setTimeError((prev) => (prev?.startsWith('End') ? null : prev));
+      }
+    } else {
+      setTimeError((prev) => (prev?.startsWith('End') ? null : prev));
+    }
+  }, [isValidTime]);
 
   // Reset form when opened / populate when editing
   useEffect(() => {
     if (visible) {
+      setTimeError(null);
       if (editingItem) {
         setEmoji(editingItem.emoji);
         setLabel(editingItem.label);
@@ -97,6 +130,17 @@ export default function AddItemSheet({
         ],
       );
       return;
+    }
+
+    if (showTimeRule) {
+      if (!isValidTime(startTime)) {
+        setTimeError('Start time must be HH:mm (00:00 - 23:59)');
+        return;
+      }
+      if (!isValidTime(endTime)) {
+        setTimeError('End time must be HH:mm (00:00 - 23:59)');
+        return;
+      }
     }
 
     const timeRule: TimeRule | null = showTimeRule ? { days, start: startTime, end: endTime } : null;
@@ -167,9 +211,9 @@ export default function AddItemSheet({
             <Text style={styles.timeLabel}>Time range</Text>
             <View style={styles.timeRow}>
               <TextInput
-                style={styles.timeInput}
+                style={[styles.timeInput, timeError?.startsWith('Start') && styles.timeInputError]}
                 value={startTime}
-                onChangeText={setStartTime}
+                onChangeText={handleStartTimeChange}
                 placeholder="07:00"
                 placeholderTextColor={colors.inkSoft + '80'}
                 keyboardType="numbers-and-punctuation"
@@ -177,15 +221,16 @@ export default function AddItemSheet({
               />
               <Text style={styles.timeDash}>{'\u2013'}</Text>
               <TextInput
-                style={styles.timeInput}
+                style={[styles.timeInput, timeError?.startsWith('End') && styles.timeInputError]}
                 value={endTime}
-                onChangeText={setEndTime}
+                onChangeText={handleEndTimeChange}
                 placeholder="09:00"
                 placeholderTextColor={colors.inkSoft + '80'}
                 keyboardType="numbers-and-punctuation"
                 maxLength={5}
               />
             </View>
+            {timeError && <Text style={styles.timeErrorText}>{timeError}</Text>}
           </View>
         )}
 
@@ -333,6 +378,15 @@ const styles = StyleSheet.create({
   timeDash: {
     fontSize: 16,
     color: colors.inkSoft,
+  },
+  timeInputError: {
+    borderWidth: 1,
+    borderColor: '#E53935',
+  },
+  timeErrorText: {
+    fontSize: 12,
+    color: '#E53935',
+    marginTop: 6,
   },
 
   // Limit banner

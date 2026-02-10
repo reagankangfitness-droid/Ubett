@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEYS = {
@@ -78,7 +78,8 @@ export function useChecklist() {
           const storedChecks: string[] = rawChecks[1] ? JSON.parse(rawChecks[1]) : [];
           setChecked(new Set(storedChecks));
         }
-      } catch {
+      } catch (err) {
+        console.warn('[useChecklist] Failed to load from AsyncStorage:', err);
         setItems(DEFAULT_ITEMS);
       } finally {
         initialized.current = true;
@@ -99,9 +100,15 @@ export function useChecklist() {
   }, []);
 
   // ── Derived state ─────────────────────────────────────────
-  const activeItems = items.filter((i) => i.isActive);
-  const allChecked = activeItems.length > 0 && activeItems.every((i) => checked.has(i.id));
-  const checkedCount = activeItems.filter((i) => checked.has(i.id)).length;
+  const activeItems = useMemo(() => items.filter((i) => i.isActive), [items]);
+  const allChecked = useMemo(
+    () => activeItems.length > 0 && activeItems.every((i) => checked.has(i.id)),
+    [activeItems, checked],
+  );
+  const checkedCount = useMemo(
+    () => activeItems.filter((i) => checked.has(i.id)).length,
+    [activeItems, checked],
+  );
 
   // ── Toggle a single item ──────────────────────────────────
   // Returns true if this toggle completes the list.
