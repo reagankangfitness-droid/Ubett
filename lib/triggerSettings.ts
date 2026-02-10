@@ -14,6 +14,14 @@ export interface TriggerSettings {
   cooldownMinutes: number;
   /** ISO timestamp of the last trigger fire. */
   lastTriggeredAt: string | null;
+  /** Whether geofence-based departure detection is enabled. */
+  geofenceEnabled: boolean;
+  /** Home latitude for geofencing. */
+  homeLatitude: number | null;
+  /** Home longitude for geofencing. */
+  homeLongitude: number | null;
+  /** Geofence radius in meters. */
+  homeRadiusMeters: number;
 }
 
 export const DEFAULT_TRIGGER_SETTINGS: TriggerSettings = {
@@ -23,6 +31,10 @@ export const DEFAULT_TRIGGER_SETTINGS: TriggerSettings = {
   activeEnd: '22:00',
   cooldownMinutes: 120,
   lastTriggeredAt: null,
+  geofenceEnabled: false,
+  homeLatitude: null,
+  homeLongitude: null,
+  homeRadiusMeters: 150,
 };
 
 export async function loadTriggerSettings(): Promise<TriggerSettings> {
@@ -53,4 +65,13 @@ export function isCooldownElapsed(lastTriggeredAt: string | null, cooldownMinute
   if (!lastTriggeredAt) return true;
   const elapsed = Date.now() - new Date(lastTriggeredAt).getTime();
   return elapsed >= cooldownMinutes * 60 * 1000;
+}
+
+const DEDUP_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Returns true if lastTriggeredAt is within the 5-minute deduplication window. */
+export function isWithinDeduplicationWindow(lastTriggeredAt: string | null): boolean {
+  if (!lastTriggeredAt) return false;
+  const elapsed = Date.now() - new Date(lastTriggeredAt).getTime();
+  return elapsed < DEDUP_WINDOW_MS;
 }

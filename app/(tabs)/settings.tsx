@@ -16,6 +16,12 @@ import { useDepartureTrigger } from '@/hooks/useDepartureTrigger';
 import { requestNotificationPermissions } from '@/lib/notifications';
 import { useChecklist } from '@/hooks/useChecklist';
 import BottomSheet from '@/components/BottomSheet';
+import {
+  requestForegroundLocation,
+  requestBackgroundLocation,
+  getCurrentLocation,
+  getAddressFromCoords,
+} from '@/lib/locationPermissions';
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => {
   const value = `${String(h).padStart(2, '0')}:00`;
@@ -30,14 +36,24 @@ const COOLDOWN_OPTIONS = [
   { value: 240, label: '4 hours' },
 ];
 
-type PickerKind = 'activeStart' | 'activeEnd' | 'cooldown' | null;
+const RADIUS_OPTIONS = [
+  { value: 100, label: '100 m' },
+  { value: 150, label: '150 m (recommended)' },
+  { value: 200, label: '200 m' },
+  { value: 300, label: '300 m' },
+  { value: 500, label: '500 m' },
+];
+
+type PickerKind = 'activeStart' | 'activeEnd' | 'cooldown' | 'radius' | null;
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { settings, loading, wifiConnected, updateSettings, detectWifi } = useDepartureTrigger();
+  const { settings, loading, wifiConnected, updateSettings, detectWifi, geofenceActive } = useDepartureTrigger();
   const { resetChecks } = useChecklist();
   const [ssidInput, setSsidInput] = useState('');
   const [pickerOpen, setPickerOpen] = useState<PickerKind>(null);
+  const [locationExplanationVisible, setLocationExplanationVisible] = useState(false);
+  const [settingLocation, setSettingLocation] = useState(false);
 
   useEffect(() => {
     if (!loading) {
@@ -104,6 +120,8 @@ export default function SettingsScreen() {
       updateSettings({ ...settings, activeEnd: value as string });
     } else if (kind === 'cooldown') {
       updateSettings({ ...settings, cooldownMinutes: value as number });
+    } else if (kind === 'radius') {
+      updateSettings({ ...settings, homeRadiusMeters: value as number });
     }
     setPickerOpen(null);
   };
@@ -113,6 +131,77 @@ export default function SettingsScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Reset', style: 'destructive', onPress: () => resetChecks() },
     ]);
+  };
+
+  const handleToggleGeofence = async (value: boolean) => {
+    if (!value) {
+      await updateSettings({ ...settings, geofenceEnabled: false });
+      return;
+    }
+
+    // Request foreground permission first
+    const fg = await requestForegroundLocation();
+    if (!fg.granted) {
+      Alert.alert('Location Required', 'Please enable location access in Settings to use geofencing.');
+      return;
+    }
+
+    // Show explanation before requesting background permission
+    setLocationExplanationVisible(true);
+  };
+
+  const handleLocationExplanationContinue = async () => {
+    setLocationExplanationVisible(false);
+
+    const bg = await requestBackgroundLocation();
+    if (!bg.granted) {
+      Alert.alert(
+        'Background Location Required',
+        'DoorCheck needs "Always Allow" location access for geofencing to work when the app is closed.',
+      );
+      return;
+    }
+
+    await updateSettings({ ...settings, geofenceEnabled: true });
+  };
+
+  const handleSetHomeLocation = async () => {
+    setSettingLocation(true);
+    try {
+      const fg = await requestForegroundLocation();
+      if (!fg.granted) {
+        Alert.alert('Location Required', 'Please enable location access to set your home position.');
+        return;
+      }
+
+      const coords = await getCurrentLocation();
+      if (!coords) {
+        Alert.alert('Location Error', 'Could not determine your current location. Please try again.');
+        return;
+      }
+
+      const address = await getAddressFromCoords(coords.latitude, coords.longitude);
+      const displayText = address ?? `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`;
+
+      Alert.alert(
+        'Set Home Location',
+        `Use this as your home?\n\n${displayText}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Confirm',
+            onPress: () =>
+              updateSettings({
+                ...settings,
+                homeLatitude: coords.latitude,
+                homeLongitude: coords.longitude,
+              }),
+          },
+        ],
+      );
+    } finally {
+      setSettingLocation(false);
+    }
   };
 
   const formatTime = (time: string) => {
@@ -126,6 +215,16 @@ export default function SettingsScreen() {
   const formatCooldown = (mins: number) => {
     const opt = COOLDOWN_OPTIONS.find((o) => o.value === mins);
     return opt?.label ?? `${mins} min`;
+  };
+
+  const formatRadius = (meters: number) => {
+    const opt = RADIUS_OPTIONS.find((o) => o.value === meters);
+    return opt?.label ?? `${meters} m`;
+  };
+
+  const formatCoords = (lat: number | null, lng: number | null) => {
+    if (lat == null || lng == null) return 'Not set';
+    return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   };
 
   return (
@@ -206,6 +305,58 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
+        {/* ── Geofence Backup Section ───────────────── */}
+        <Text style={styles.sectionTitle}>GEOFENCE BACKUP</Text>
+        <View style={styles.card}>
+          {/* Geofence toggle */}
+          <View style={styles.row}>
+            <View style={styles.rowTextCol}>
+              <Text style={styles.rowLabel}>Geofence</Text>
+              <Text style={styles.rowHint}>Backup departure detection via GPS</Text>
+            </View>
+            <Switch
+              value={settings.geofenceEnabled}
+              onValueChange={handleToggleGeofence}
+              disabled={!settings.enabled}
+              trackColor={{ false: colors.border, true: colors.green }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {settings.geofenceEnabled && (
+            <>
+              <View style={styles.divider} />
+
+              {/* Home location */}
+              <View style={styles.ssidRow}>
+                <Text style={styles.rowLabel}>Home Location</Text>
+                <View style={styles.ssidInputRow}>
+                  <Text style={[styles.rowValue, { flex: 1 }]}>
+                    {formatCoords(settings.homeLatitude, settings.homeLongitude)}
+                  </Text>
+                  <Pressable
+                    style={[styles.detectBtn, settingLocation && { opacity: 0.5 }]}
+                    onPress={handleSetHomeLocation}
+                    disabled={settingLocation}
+                  >
+                    <Text style={styles.detectBtnText}>
+                      {settingLocation ? 'Locating...' : 'Use Current Location'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* Detection radius */}
+              <Pressable style={styles.row} onPress={() => setPickerOpen('radius')}>
+                <Text style={styles.rowLabel}>Detection Radius</Text>
+                <Text style={styles.rowValue}>{formatRadius(settings.homeRadiusMeters)}</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+
         {/* ── General Section ─────────────────────────── */}
         <Text style={styles.sectionTitle}>GENERAL</Text>
         <View style={styles.card}>
@@ -218,13 +369,22 @@ export default function SettingsScreen() {
         <Text style={styles.footnote}>
           Departure detection monitors your WiFi connection. When you disconnect from WiFi during
           active hours, you'll receive a reminder after a 30-second delay.
+          {settings.geofenceEnabled
+            ? ' Geofence backup uses your home location to detect departures when WiFi detection is unavailable. Your location is never tracked or stored beyond your device.'
+            : ''}
         </Text>
       </ScrollView>
 
       {/* ── Option picker sheet ─────────────────────── */}
       <BottomSheet visible={pickerOpen !== null} onClose={() => setPickerOpen(null)}>
         <Text style={styles.pickerTitle}>
-          {pickerOpen === 'activeStart' ? 'Active From' : pickerOpen === 'activeEnd' ? 'Active Until' : 'Cooldown'}
+          {pickerOpen === 'activeStart'
+            ? 'Active From'
+            : pickerOpen === 'activeEnd'
+              ? 'Active Until'
+              : pickerOpen === 'radius'
+                ? 'Detection Radius'
+                : 'Cooldown'}
         </Text>
         <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
           {pickerOpen === 'cooldown'
@@ -239,21 +399,51 @@ export default function SettingsScreen() {
                   </Text>
                 </Pressable>
               ))
-            : HOUR_OPTIONS.map((opt) => {
-                const current = pickerOpen === 'activeStart' ? settings.activeStart : settings.activeEnd;
-                return (
+            : pickerOpen === 'radius'
+              ? RADIUS_OPTIONS.map((opt) => (
                   <Pressable
                     key={opt.value}
-                    style={[styles.pickerOption, current === opt.value && styles.pickerOptionActive]}
-                    onPress={() => handlePickerSelect(pickerOpen, opt.value)}
+                    style={[styles.pickerOption, settings.homeRadiusMeters === opt.value && styles.pickerOptionActive]}
+                    onPress={() => handlePickerSelect('radius', opt.value)}
                   >
-                    <Text style={[styles.pickerOptionText, current === opt.value && styles.pickerOptionTextActive]}>
+                    <Text style={[styles.pickerOptionText, settings.homeRadiusMeters === opt.value && styles.pickerOptionTextActive]}>
                       {opt.label}
                     </Text>
                   </Pressable>
-                );
-              })}
+                ))
+              : HOUR_OPTIONS.map((opt) => {
+                  const current = pickerOpen === 'activeStart' ? settings.activeStart : settings.activeEnd;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      style={[styles.pickerOption, current === opt.value && styles.pickerOptionActive]}
+                      onPress={() => handlePickerSelect(pickerOpen, opt.value)}
+                    >
+                      <Text style={[styles.pickerOptionText, current === opt.value && styles.pickerOptionTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
         </ScrollView>
+      </BottomSheet>
+
+      {/* ── Location explanation sheet ─────────────── */}
+      <BottomSheet visible={locationExplanationVisible} onClose={() => setLocationExplanationVisible(false)}>
+        <Text style={styles.pickerTitle}>Background Location</Text>
+        <Text style={styles.explanationText}>
+          DoorCheck uses a geofence around your home to detect when you leave. This requires "Always
+          Allow" location access. Your location is never tracked or stored.
+        </Text>
+        <Pressable style={styles.explanationBtn} onPress={handleLocationExplanationContinue}>
+          <Text style={styles.explanationBtnText}>Continue</Text>
+        </Pressable>
+        <Pressable
+          style={styles.explanationCancelBtn}
+          onPress={() => setLocationExplanationVisible(false)}
+        >
+          <Text style={styles.explanationCancelText}>Cancel</Text>
+        </Pressable>
       </BottomSheet>
     </View>
   );
@@ -403,5 +593,36 @@ const styles = StyleSheet.create({
   pickerOptionTextActive: {
     color: colors.orange,
     fontWeight: '700',
+  },
+  explanationText: {
+    fontSize: 15,
+    color: colors.inkSoft,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 20,
+    fontFamily: 'System',
+  },
+  explanationBtn: {
+    backgroundColor: colors.orange,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  explanationBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: 'System',
+  },
+  explanationCancelBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  explanationCancelText: {
+    color: colors.inkSoft,
+    fontSize: 15,
+    fontWeight: '500',
+    fontFamily: 'System',
   },
 });

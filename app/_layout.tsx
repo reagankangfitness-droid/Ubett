@@ -5,8 +5,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
-// Register background task (must be at module level)
+// Register background tasks (must be at module level)
 import '@/lib/backgroundTask';
+import '@/lib/geofenceTask';
 import { requestNotificationPermissions, setupNotificationChannel } from '@/lib/notifications';
 
 export { ErrorBoundary } from 'expo-router';

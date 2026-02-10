@@ -11,6 +11,7 @@ import {
 } from '@/lib/triggerSettings';
 import { sendDepartureNotification } from '@/lib/notifications';
 import { registerBackgroundTask, unregisterBackgroundTask } from '@/lib/backgroundTask';
+import { startGeofencing, stopGeofencing } from '@/lib/geofenceTask';
 
 const POLL_INTERVAL = 10_000; // check every 10 s
 const DEBOUNCE_MS = 30_000;   // 30 s disconnect debounce
@@ -43,6 +44,17 @@ export function useDepartureTrigger() {
       await registerBackgroundTask();
     } else {
       await unregisterBackgroundTask();
+    }
+
+    // Sync geofence lifecycle
+    try {
+      if (next.enabled && next.geofenceEnabled && next.homeLatitude != null && next.homeLongitude != null) {
+        await startGeofencing(next.homeLatitude, next.homeLongitude, next.homeRadiusMeters);
+      } else {
+        await stopGeofencing();
+      }
+    } catch {
+      // User may have revoked location permission
     }
   }, []);
 
@@ -117,11 +129,18 @@ export function useDepartureTrigger() {
     return state.type === Network.NetworkStateType.WIFI && !!state.isConnected;
   }, []);
 
+  const geofenceActive =
+    settings.enabled &&
+    settings.geofenceEnabled &&
+    settings.homeLatitude != null &&
+    settings.homeLongitude != null;
+
   return {
     settings,
     loading,
     wifiConnected,
     updateSettings,
     detectWifi,
+    geofenceActive,
   };
 }
