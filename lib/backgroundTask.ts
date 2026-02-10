@@ -2,30 +2,15 @@ import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
 import * as Network from 'expo-network';
 
-import { loadTriggerSettings, saveTriggerSettings } from './triggerSettings';
+import {
+  loadTriggerSettings,
+  saveTriggerSettings,
+  isWithinActiveHours,
+  isCooldownElapsed,
+} from './triggerSettings';
 import { sendDepartureNotification } from './notifications';
 
 export const DEPARTURE_TASK_NAME = 'doorcheck-departure-check';
-
-/**
- * Returns true if the current time falls within the active window.
- */
-function isWithinActiveHours(start: string, end: string): boolean {
-  const now = new Date();
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  const mins = now.getHours() * 60 + now.getMinutes();
-  return mins >= sh * 60 + sm && mins <= eh * 60 + em;
-}
-
-/**
- * Returns true if enough time has passed since the last trigger.
- */
-function isCooldownElapsed(lastTriggeredAt: string | null, cooldownMinutes: number): boolean {
-  if (!lastTriggeredAt) return true;
-  const elapsed = Date.now() - new Date(lastTriggeredAt).getTime();
-  return elapsed >= cooldownMinutes * 60 * 1000;
-}
 
 /**
  * Define the background task.  Must be called at module-level (outside components).

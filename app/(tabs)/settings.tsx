@@ -15,10 +15,12 @@ import { colors } from '@/constants/theme';
 import { useDepartureTrigger } from '@/hooks/useDepartureTrigger';
 import { requestNotificationPermissions } from '@/lib/notifications';
 import { useChecklist } from '@/hooks/useChecklist';
+import BottomSheet from '@/components/BottomSheet';
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => {
-  const label = `${String(h).padStart(2, '0')}:00`;
-  return { value: label, label: h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM` };
+  const value = `${String(h).padStart(2, '0')}:00`;
+  const label = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`;
+  return { value, label };
 });
 
 const COOLDOWN_OPTIONS = [
@@ -28,11 +30,14 @@ const COOLDOWN_OPTIONS = [
   { value: 240, label: '4 hours' },
 ];
 
+type PickerKind = 'activeStart' | 'activeEnd' | 'cooldown' | null;
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { settings, loading, wifiConnected, updateSettings, detectWifi } = useDepartureTrigger();
   const { resetChecks } = useChecklist();
   const [ssidInput, setSsidInput] = useState('');
+  const [pickerOpen, setPickerOpen] = useState<PickerKind>(null);
 
   useEffect(() => {
     if (!loading) {
@@ -92,37 +97,15 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleSetActiveStart = () => {
-    Alert.alert(
-      'Active Hours Start',
-      'Select start hour:',
-      HOUR_OPTIONS.map((opt) => ({
-        text: opt.label,
-        onPress: () => updateSettings({ ...settings, activeStart: opt.value }),
-      })).concat({ text: 'Cancel', onPress: () => {}, style: 'cancel' } as any),
-    );
-  };
-
-  const handleSetActiveEnd = () => {
-    Alert.alert(
-      'Active Hours End',
-      'Select end hour:',
-      HOUR_OPTIONS.map((opt) => ({
-        text: opt.label,
-        onPress: () => updateSettings({ ...settings, activeEnd: opt.value }),
-      })).concat({ text: 'Cancel', onPress: () => {}, style: 'cancel' } as any),
-    );
-  };
-
-  const handleSetCooldown = () => {
-    Alert.alert(
-      'Cooldown Period',
-      'Minimum time between reminders:',
-      COOLDOWN_OPTIONS.map((opt) => ({
-        text: opt.label,
-        onPress: () => updateSettings({ ...settings, cooldownMinutes: opt.value }),
-      })).concat({ text: 'Cancel', onPress: () => {}, style: 'cancel' } as any),
-    );
+  const handlePickerSelect = (kind: PickerKind, value: string | number) => {
+    if (kind === 'activeStart') {
+      updateSettings({ ...settings, activeStart: value as string });
+    } else if (kind === 'activeEnd') {
+      updateSettings({ ...settings, activeEnd: value as string });
+    } else if (kind === 'cooldown') {
+      updateSettings({ ...settings, cooldownMinutes: value as number });
+    }
+    setPickerOpen(null);
   };
 
   const handleResetChecks = () => {
@@ -202,14 +185,14 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
 
           {/* Active hours */}
-          <Pressable style={styles.row} onPress={handleSetActiveStart}>
+          <Pressable style={styles.row} onPress={() => setPickerOpen('activeStart')}>
             <Text style={styles.rowLabel}>Active From</Text>
             <Text style={styles.rowValue}>{formatTime(settings.activeStart)}</Text>
           </Pressable>
 
           <View style={styles.divider} />
 
-          <Pressable style={styles.row} onPress={handleSetActiveEnd}>
+          <Pressable style={styles.row} onPress={() => setPickerOpen('activeEnd')}>
             <Text style={styles.rowLabel}>Active Until</Text>
             <Text style={styles.rowValue}>{formatTime(settings.activeEnd)}</Text>
           </Pressable>
@@ -217,7 +200,7 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
 
           {/* Cooldown */}
-          <Pressable style={styles.row} onPress={handleSetCooldown}>
+          <Pressable style={styles.row} onPress={() => setPickerOpen('cooldown')}>
             <Text style={styles.rowLabel}>Cooldown</Text>
             <Text style={styles.rowValue}>{formatCooldown(settings.cooldownMinutes)}</Text>
           </Pressable>
@@ -237,6 +220,41 @@ export default function SettingsScreen() {
           active hours, you'll receive a reminder after a 30-second delay.
         </Text>
       </ScrollView>
+
+      {/* ── Option picker sheet ─────────────────────── */}
+      <BottomSheet visible={pickerOpen !== null} onClose={() => setPickerOpen(null)}>
+        <Text style={styles.pickerTitle}>
+          {pickerOpen === 'activeStart' ? 'Active From' : pickerOpen === 'activeEnd' ? 'Active Until' : 'Cooldown'}
+        </Text>
+        <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
+          {pickerOpen === 'cooldown'
+            ? COOLDOWN_OPTIONS.map((opt) => (
+                <Pressable
+                  key={opt.value}
+                  style={[styles.pickerOption, settings.cooldownMinutes === opt.value && styles.pickerOptionActive]}
+                  onPress={() => handlePickerSelect('cooldown', opt.value)}
+                >
+                  <Text style={[styles.pickerOptionText, settings.cooldownMinutes === opt.value && styles.pickerOptionTextActive]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))
+            : HOUR_OPTIONS.map((opt) => {
+                const current = pickerOpen === 'activeStart' ? settings.activeStart : settings.activeEnd;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    style={[styles.pickerOption, current === opt.value && styles.pickerOptionActive]}
+                    onPress={() => handlePickerSelect(pickerOpen, opt.value)}
+                  >
+                    <Text style={[styles.pickerOptionText, current === opt.value && styles.pickerOptionTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+        </ScrollView>
+      </BottomSheet>
     </View>
   );
 }
@@ -354,5 +372,36 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginHorizontal: 4,
     fontFamily: 'System',
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.ink,
+    textAlign: 'center',
+    marginBottom: 12,
+    fontFamily: 'System',
+  },
+  pickerScroll: {
+    maxHeight: 320,
+  },
+  pickerOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  pickerOptionActive: {
+    backgroundColor: colors.cream,
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.ink,
+    textAlign: 'center',
+    fontFamily: 'System',
+  },
+  pickerOptionTextActive: {
+    color: colors.orange,
+    fontWeight: '700',
   },
 });

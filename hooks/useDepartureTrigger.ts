@@ -6,26 +6,14 @@ import {
   DEFAULT_TRIGGER_SETTINGS,
   loadTriggerSettings,
   saveTriggerSettings,
+  isWithinActiveHours,
+  isCooldownElapsed,
 } from '@/lib/triggerSettings';
 import { sendDepartureNotification } from '@/lib/notifications';
 import { registerBackgroundTask, unregisterBackgroundTask } from '@/lib/backgroundTask';
 
 const POLL_INTERVAL = 10_000; // check every 10 s
 const DEBOUNCE_MS = 30_000;   // 30 s disconnect debounce
-
-function isWithinActiveHours(start: string, end: string): boolean {
-  const now = new Date();
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  const mins = now.getHours() * 60 + now.getMinutes();
-  return mins >= sh * 60 + sm && mins <= eh * 60 + em;
-}
-
-function isCooldownElapsed(lastTriggeredAt: string | null, cooldownMinutes: number): boolean {
-  if (!lastTriggeredAt) return true;
-  const elapsed = Date.now() - new Date(lastTriggeredAt).getTime();
-  return elapsed >= cooldownMinutes * 60 * 1000;
-}
 
 export function useDepartureTrigger() {
   const [settings, setSettings] = useState<TriggerSettings>(DEFAULT_TRIGGER_SETTINGS);
@@ -61,11 +49,12 @@ export function useDepartureTrigger() {
   // ── Foreground WiFi polling ─────────────────────────────────
   useEffect(() => {
     if (!settings.enabled) {
-      // Clear timers when disabled
+      // Clear timers and reset state when disabled
       if (disconnectTimer.current) {
         clearTimeout(disconnectTimer.current);
         disconnectTimer.current = null;
       }
+      wasOnWifi.current = false;
       return;
     }
 
