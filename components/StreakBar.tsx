@@ -1,20 +1,52 @@
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
 import { colors } from '@/constants/theme';
 
 interface Props {
   current: number;
   longest: number;
+  /** Triggers a pulse celebration animation. */
+  celebrating?: boolean;
 }
 
-export default function StreakBar({ current, longest }: Props) {
+export default function StreakBar({ current, longest, celebrating }: Props) {
+  const baseScale = useSharedValue(current > 0 ? 1 : 0.95);
+  const baseOpacity = useSharedValue(current > 0 ? 1 : 0.5);
+  const celebrateScale = useSharedValue(1);
+
+  baseScale.value = withSpring(current > 0 ? 1 : 0.95, { damping: 14 });
+  baseOpacity.value = withSpring(current > 0 ? 1 : 0.5, { damping: 14 });
+
+  useEffect(() => {
+    if (celebrating) {
+      celebrateScale.value = withSequence(
+        withSpring(1.04, { damping: 6, stiffness: 400 }),
+        withSpring(0.98, { damping: 8, stiffness: 300 }),
+        withSpring(1.02, { damping: 10, stiffness: 300 }),
+        withSpring(1, { damping: 14 }),
+      );
+    }
+  }, [celebrating, celebrateScale]);
+
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withSpring(current > 0 ? 1 : 0.95, { damping: 14 }) }],
-    opacity: withSpring(current > 0 ? 1 : 0.5, { damping: 14 }),
+    transform: [{ scale: baseScale.value * celebrateScale.value }],
+    opacity: baseOpacity.value,
   }));
 
   return (
-    <Animated.View style={[styles.container, animatedStyle]}>
+    <Animated.View
+      style={[
+        styles.container,
+        celebrating && styles.celebrateBorder,
+        animatedStyle,
+      ]}
+    >
       <View style={styles.row}>
         <Text style={styles.fire}>{'\uD83D\uDD25'}</Text>
         <Text style={styles.streakCount}>{current}</Text>
@@ -41,6 +73,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  celebrateBorder: {
+    borderColor: colors.orange,
   },
   row: {
     flexDirection: 'row',

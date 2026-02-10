@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
+  FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -16,6 +17,8 @@ interface Props {
   isChecked: boolean;
   onToggle: () => void;
   onLongPress?: () => void;
+  /** Index in the list — drives staggered entering animation. */
+  index?: number;
   // Reorder mode
   isReordering?: boolean;
   onMoveUp?: () => void;
@@ -32,6 +35,7 @@ export default function ChecklistCard({
   isChecked,
   onToggle,
   onLongPress,
+  index,
   isReordering,
   onMoveUp,
   onMoveDown,
@@ -40,11 +44,20 @@ export default function ChecklistCard({
 }: Props) {
   const scale = useSharedValue(1);
   const checkboxScale = useSharedValue(isChecked ? 1 : 0);
+  const checkboxBounce = useSharedValue(1);
+  const rowSlide = useSharedValue(0);
 
   checkboxScale.value = withSpring(isChecked ? 1 : 0, { damping: 12, stiffness: 180 });
 
   const cardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [
+      { scale: scale.value },
+      { translateX: rowSlide.value },
+    ],
+  }));
+
+  const checkboxContainerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkboxBounce.value }],
   }));
 
   const fillStyle = useAnimatedStyle(() => ({
@@ -54,10 +67,27 @@ export default function ChecklistCard({
 
   const handlePress = () => {
     if (isReordering) return;
+
+    // Card press feedback
     scale.value = withSequence(
       withTiming(0.97, { duration: 60 }),
       withSpring(1, { damping: 10, stiffness: 300 }),
     );
+
+    // Extra animations when checking (not unchecking)
+    if (!isChecked) {
+      // Checkbox bounce: 1 → 1.25 → 1
+      checkboxBounce.value = withSequence(
+        withSpring(1.25, { damping: 6, stiffness: 400 }),
+        withSpring(1, { damping: 10, stiffness: 300 }),
+      );
+      // Row nudge right then back
+      rowSlide.value = withSequence(
+        withTiming(2, { duration: 80 }),
+        withTiming(0, { duration: 120 }),
+      );
+    }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onToggle();
   };
@@ -75,7 +105,10 @@ export default function ChecklistCard({
   };
 
   return (
-    <Animated.View layout={LinearTransition.springify().damping(18).stiffness(200)}>
+    <Animated.View
+      layout={LinearTransition.springify().damping(18).stiffness(200)}
+      entering={FadeIn.delay((index ?? 0) * 50).duration(200)}
+    >
       <AnimatedPressable
         style={[styles.card, isReordering && styles.cardReorder, cardStyle]}
         onPress={handlePress}
@@ -107,11 +140,11 @@ export default function ChecklistCard({
           </>
         ) : (
           <>
-            <View style={styles.checkbox}>
+            <Animated.View style={[styles.checkbox, checkboxContainerStyle]}>
               <Animated.View style={[styles.checkboxFill, fillStyle]}>
                 <Text style={styles.checkmark}>{'\u2713'}</Text>
               </Animated.View>
-            </View>
+            </Animated.View>
             <Text style={styles.emoji}>{emoji}</Text>
             <Text style={[styles.label, isChecked && styles.labelChecked]}>{label}</Text>
           </>

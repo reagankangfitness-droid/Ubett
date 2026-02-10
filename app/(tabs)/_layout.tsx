@@ -13,6 +13,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
+        animation: 'fade',
         tabBarActiveTintColor: colors.orange,
         tabBarInactiveTintColor: colors.inkSoft,
         tabBarStyle: {

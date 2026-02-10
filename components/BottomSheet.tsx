@@ -12,11 +12,12 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
 const SCREEN_H = Dimensions.get('window').height;
-const TIMING = { duration: 280 };
+const DISMISS = { duration: 200 };
 
 interface Props {
   visible: boolean;
@@ -30,11 +31,11 @@ export default function BottomSheet({ visible, onClose, children }: Props) {
 
   useEffect(() => {
     if (visible) {
-      translateY.value = withTiming(0, TIMING);
-      backdrop.value = withTiming(1, TIMING);
+      translateY.value = withSpring(0, { damping: 20, stiffness: 300 });
+      backdrop.value = withTiming(1, { duration: 250 });
     } else {
-      translateY.value = withTiming(SCREEN_H, TIMING);
-      backdrop.value = withTiming(0, TIMING);
+      translateY.value = withTiming(SCREEN_H, DISMISS);
+      backdrop.value = withTiming(0, DISMISS);
     }
   }, [visible, translateY, backdrop]);
 
@@ -47,10 +48,10 @@ export default function BottomSheet({ visible, onClose, children }: Props) {
   }));
 
   const handleClose = () => {
-    translateY.value = withTiming(SCREEN_H, TIMING, () => {
+    translateY.value = withTiming(SCREEN_H, DISMISS, () => {
       runOnJS(onClose)();
     });
-    backdrop.value = withTiming(0, TIMING);
+    backdrop.value = withTiming(0, DISMISS);
   };
 
   return (

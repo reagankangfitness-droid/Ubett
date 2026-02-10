@@ -1,7 +1,15 @@
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, SlideInLeft, LinearTransition } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 
 import { colors } from '@/constants/theme';
@@ -12,6 +20,10 @@ import ChecklistCard from '@/components/ChecklistCard';
 import StreakBar from '@/components/StreakBar';
 import AddItemSheet from '@/components/AddItemSheet';
 import ItemActionMenu from '@/components/ItemActionMenu';
+import ConfettiBurst from '@/components/ConfettiBurst';
+import MilestoneModal from '@/components/MilestoneModal';
+
+const MILESTONES = [7, 14, 30, 60, 100];
 
 export default function CheckScreen() {
   const insets = useSafeAreaInsets();
@@ -27,6 +39,7 @@ export default function CheckScreen() {
     updateItem,
     deleteItem,
     reorderItems,
+    resetChecks,
   } = useChecklist();
 
   const streak = useStreak();
@@ -37,6 +50,28 @@ export default function CheckScreen() {
   const [selectedItem, setSelectedItem] = useState<LocalCheckItem | null>(null);
   const [editingItem, setEditingItem] = useState<LocalCheckItem | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+
+  // Animation state
+  const [confettiTrigger, setConfettiTrigger] = useState(0);
+  const [celebrating, setCelebrating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Milestone state
+  const [milestoneVisible, setMilestoneVisible] = useState(false);
+  const [milestoneCount, setMilestoneCount] = useState(0);
+  const prevStreak = useRef(streak.currentStreak);
+
+  // Detect streak milestones
+  useEffect(() => {
+    const prev = prevStreak.current;
+    const curr = streak.currentStreak;
+    if (curr > prev && MILESTONES.includes(curr)) {
+      setMilestoneCount(curr);
+      setMilestoneVisible(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    prevStreak.current = curr;
+  }, [streak.currentStreak]);
 
   if (loading || streak.loading) {
     return (
@@ -53,6 +88,9 @@ export default function CheckScreen() {
       streak.recordCheck();
       cancelStreakReminder();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setConfettiTrigger((prev) => prev + 1);
+      setCelebrating(true);
+      setTimeout(() => setCelebrating(false), 1200);
     }
   };
 
@@ -97,11 +135,26 @@ export default function CheckScreen() {
     setIsReordering(true);
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await resetChecks();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setRefreshing(false);
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.orange}
+            colors={[colors.orange]}
+          />
+        }
       >
         {/* ── Header ──────────────────────────────────── */}
         <View style={styles.header}>
@@ -118,7 +171,7 @@ export default function CheckScreen() {
               <Text style={styles.title}>Morning Check</Text>
               <Animated.Text
                 key={allChecked ? 'done' : 'tap'}
-                entering={FadeIn.duration(200)}
+                entering={allChecked ? SlideInLeft.duration(250).springify().damping(14) : FadeIn.duration(200)}
                 exiting={FadeOut.duration(150)}
                 style={[styles.subtitle, allChecked && styles.subtitleDone]}
               >
@@ -158,6 +211,7 @@ export default function CheckScreen() {
               isChecked={checked.has(item.id)}
               onToggle={() => handleToggle(item.id)}
               onLongPress={() => handleLongPress(item)}
+              index={index}
               isReordering={isReordering}
               onMoveUp={() => reorderItems(index, index - 1)}
               onMoveDown={() => reorderItems(index, index + 1)}
@@ -186,9 +240,23 @@ export default function CheckScreen() {
       {/* ── Streak bar (pinned to bottom) ─────────── */}
       {!isReordering && (
         <View style={[styles.footer, { paddingBottom: insets.bottom + 8 }]}>
-          <StreakBar current={streak.currentStreak} longest={streak.longestStreak} />
+          <StreakBar
+            current={streak.currentStreak}
+            longest={streak.longestStreak}
+            celebrating={celebrating}
+          />
         </View>
       )}
+
+      {/* ── Confetti overlay ─────────────────────── */}
+      <ConfettiBurst trigger={confettiTrigger} />
+
+      {/* ── Milestone modal ──────────────────────── */}
+      <MilestoneModal
+        visible={milestoneVisible}
+        streak={milestoneCount}
+        onClose={() => setMilestoneVisible(false)}
+      />
 
       {/* ── Sheets ────────────────────────────────── */}
       <AddItemSheet
