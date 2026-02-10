@@ -8,7 +8,7 @@ import {
   isWithinActiveHours,
   isCooldownElapsed,
 } from './triggerSettings';
-import { sendDepartureNotification } from './notifications';
+import { scheduleDepartureNotification } from './notifications';
 
 export const DEPARTURE_TASK_NAME = 'doorcheck-departure-check';
 
@@ -36,7 +36,7 @@ TaskManager.defineTask(DEPARTURE_TASK_NAME, async () => {
 
     // If NOT on WiFi → user may have left home → fire notification
     if (!isOnWifi) {
-      await sendDepartureNotification();
+      await scheduleDepartureNotification();
       await saveTriggerSettings({
         ...settings,
         lastTriggeredAt: new Date().toISOString(),

@@ -13,7 +13,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/constants/theme';
 import { useDepartureTrigger } from '@/hooks/useDepartureTrigger';
-import { requestNotificationPermissions } from '@/lib/notifications';
+import { requestNotificationPermissions, scheduleStreakReminder, cancelStreakReminder } from '@/lib/notifications';
+import {
+  type NotificationSettings,
+  DEFAULT_NOTIFICATION_SETTINGS,
+  loadNotificationSettings,
+  saveNotificationSettings,
+} from '@/lib/notificationSettings';
 import { useChecklist } from '@/hooks/useChecklist';
 import BottomSheet from '@/components/BottomSheet';
 import {
@@ -44,7 +50,7 @@ const RADIUS_OPTIONS = [
   { value: 500, label: '500 m' },
 ];
 
-type PickerKind = 'activeStart' | 'activeEnd' | 'cooldown' | 'radius' | null;
+type PickerKind = 'activeStart' | 'activeEnd' | 'cooldown' | 'radius' | 'quietStart' | 'quietEnd' | null;
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -54,12 +60,21 @@ export default function SettingsScreen() {
   const [pickerOpen, setPickerOpen] = useState<PickerKind>(null);
   const [locationExplanationVisible, setLocationExplanationVisible] = useState(false);
   const [settingLocation, setSettingLocation] = useState(false);
+  const [notifSettings, setNotifSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
 
   useEffect(() => {
     if (!loading) {
       setSsidInput(settings.homeSSID);
     }
   }, [loading, settings.homeSSID]);
+
+  // Load notification settings
+  useEffect(() => {
+    (async () => {
+      const ns = await loadNotificationSettings();
+      setNotifSettings(ns);
+    })();
+  }, []);
 
   if (loading) {
     return (
@@ -122,6 +137,10 @@ export default function SettingsScreen() {
       updateSettings({ ...settings, cooldownMinutes: value as number });
     } else if (kind === 'radius') {
       updateSettings({ ...settings, homeRadiusMeters: value as number });
+    } else if (kind === 'quietStart') {
+      updateNotifSettings({ ...notifSettings, quietHoursStart: value as string });
+    } else if (kind === 'quietEnd') {
+      updateNotifSettings({ ...notifSettings, quietHoursEnd: value as string });
     }
     setPickerOpen(null);
   };
@@ -201,6 +220,18 @@ export default function SettingsScreen() {
       );
     } finally {
       setSettingLocation(false);
+    }
+  };
+
+  const updateNotifSettings = async (next: NotificationSettings) => {
+    setNotifSettings(next);
+    await saveNotificationSettings(next);
+
+    // Sync streak reminder
+    if (next.streakReminders) {
+      await scheduleStreakReminder();
+    } else {
+      await cancelStreakReminder();
     }
   };
 
@@ -357,6 +388,55 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* ── Notifications Section ──────────────────── */}
+        <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
+        <View style={styles.card}>
+          {/* Departure notifications toggle */}
+          <View style={styles.row}>
+            <View style={styles.rowTextCol}>
+              <Text style={styles.rowLabel}>Departure Notifications</Text>
+              <Text style={styles.rowHint}>Get notified when leaving home</Text>
+            </View>
+            <Switch
+              value={notifSettings.departureNotifications}
+              onValueChange={(v) => updateNotifSettings({ ...notifSettings, departureNotifications: v })}
+              trackColor={{ false: colors.border, true: colors.green }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Streak reminders toggle */}
+          <View style={styles.row}>
+            <View style={styles.rowTextCol}>
+              <Text style={styles.rowLabel}>Streak Reminders</Text>
+              <Text style={styles.rowHint}>Remind to check before 8 PM</Text>
+            </View>
+            <Switch
+              value={notifSettings.streakReminders}
+              onValueChange={(v) => updateNotifSettings({ ...notifSettings, streakReminders: v })}
+              trackColor={{ false: colors.border, true: colors.green }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Quiet hours */}
+          <Pressable style={styles.row} onPress={() => setPickerOpen('quietStart')}>
+            <Text style={styles.rowLabel}>Quiet Hours Start</Text>
+            <Text style={styles.rowValue}>{formatTime(notifSettings.quietHoursStart)}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable style={styles.row} onPress={() => setPickerOpen('quietEnd')}>
+            <Text style={styles.rowLabel}>Quiet Hours End</Text>
+            <Text style={styles.rowValue}>{formatTime(notifSettings.quietHoursEnd)}</Text>
+          </Pressable>
+        </View>
+
         {/* ── General Section ─────────────────────────── */}
         <Text style={styles.sectionTitle}>GENERAL</Text>
         <View style={styles.card}>
@@ -384,7 +464,11 @@ export default function SettingsScreen() {
               ? 'Active Until'
               : pickerOpen === 'radius'
                 ? 'Detection Radius'
-                : 'Cooldown'}
+                : pickerOpen === 'quietStart'
+                  ? 'Quiet Hours Start'
+                  : pickerOpen === 'quietEnd'
+                    ? 'Quiet Hours End'
+                    : 'Cooldown'}
         </Text>
         <ScrollView style={styles.pickerScroll} showsVerticalScrollIndicator={false}>
           {pickerOpen === 'cooldown'
@@ -412,7 +496,16 @@ export default function SettingsScreen() {
                   </Pressable>
                 ))
               : HOUR_OPTIONS.map((opt) => {
-                  const current = pickerOpen === 'activeStart' ? settings.activeStart : settings.activeEnd;
+                  const current =
+                    pickerOpen === 'activeStart'
+                      ? settings.activeStart
+                      : pickerOpen === 'activeEnd'
+                        ? settings.activeEnd
+                        : pickerOpen === 'quietStart'
+                          ? notifSettings.quietHoursStart
+                          : pickerOpen === 'quietEnd'
+                            ? notifSettings.quietHoursEnd
+                            : '';
                   return (
                     <Pressable
                       key={opt.value}

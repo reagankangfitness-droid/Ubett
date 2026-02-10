@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { colors } from '@/constants/theme';
 import { useChecklist, type LocalCheckItem, type TimeRule } from '@/hooks/useChecklist';
 import { useStreak } from '@/hooks/useStreak';
+import { cancelStreakReminder } from '@/lib/notifications';
 import ChecklistCard from '@/components/ChecklistCard';
 import StreakBar from '@/components/StreakBar';
 import AddItemSheet from '@/components/AddItemSheet';
@@ -50,6 +51,7 @@ export default function CheckScreen() {
 
     if (completed) {
       streak.recordCheck();
+      cancelStreakReminder();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };

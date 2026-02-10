@@ -9,7 +9,7 @@ import {
   isWithinActiveHours,
   isCooldownElapsed,
 } from '@/lib/triggerSettings';
-import { sendDepartureNotification } from '@/lib/notifications';
+import { scheduleDepartureNotification } from '@/lib/notifications';
 import { registerBackgroundTask, unregisterBackgroundTask } from '@/lib/backgroundTask';
 import { startGeofencing, stopGeofencing } from '@/lib/geofenceTask';
 
@@ -98,7 +98,7 @@ export function useDepartureTrigger() {
             const stillOff = recheck.type !== Network.NetworkStateType.WIFI || !recheck.isConnected;
 
             if (stillOff) {
-              await sendDepartureNotification();
+              await scheduleDepartureNotification();
               const updated = { ...s, lastTriggeredAt: new Date().toISOString() };
               setSettings(updated);
               await saveTriggerSettings(updated);

@@ -8,7 +8,7 @@ import {
   isCooldownElapsed,
   isWithinDeduplicationWindow,
 } from './triggerSettings';
-import { sendDepartureNotification } from './notifications';
+import { scheduleDepartureNotification } from './notifications';
 
 export const GEOFENCE_TASK_NAME = 'doorcheck-geofence-task';
 
@@ -34,7 +34,7 @@ TaskManager.defineTask(GEOFENCE_TASK_NAME, async ({ data, error }) => {
     // Skip if WiFi (or another geofence event) already triggered within 5 min
     if (isWithinDeduplicationWindow(settings.lastTriggeredAt)) return;
 
-    await sendDepartureNotification();
+    await scheduleDepartureNotification();
     await saveTriggerSettings({
       ...settings,
       lastTriggeredAt: new Date().toISOString(),
