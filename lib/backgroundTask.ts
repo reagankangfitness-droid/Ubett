@@ -7,6 +7,7 @@ import {
   saveTriggerSettings,
   isWithinActiveHours,
   isCooldownElapsed,
+  isWithinDeduplicationWindow,
 } from './triggerSettings';
 import { scheduleDepartureNotification } from './notifications';
 
@@ -28,6 +29,10 @@ TaskManager.defineTask(DEPARTURE_TASK_NAME, async () => {
     }
 
     if (!isCooldownElapsed(settings.lastTriggeredAt, settings.cooldownMinutes)) {
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+
+    if (isWithinDeduplicationWindow(settings.lastTriggeredAt)) {
       return BackgroundFetch.BackgroundFetchResult.NoData;
     }
 

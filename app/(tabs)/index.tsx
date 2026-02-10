@@ -62,13 +62,13 @@ export default function CheckScreen() {
   // Milestone state
   const [milestoneVisible, setMilestoneVisible] = useState(false);
   const [milestoneCount, setMilestoneCount] = useState(0);
-  const prevStreak = useRef(streak.currentStreak);
+  const prevStreak = useRef(-1);
 
   // Detect streak milestones
   useEffect(() => {
     const prev = prevStreak.current;
     const curr = streak.currentStreak;
-    if (curr > prev && MILESTONES.includes(curr)) {
+    if (prev !== -1 && curr > prev && MILESTONES.includes(curr)) {
       setMilestoneCount(curr);
       setMilestoneVisible(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

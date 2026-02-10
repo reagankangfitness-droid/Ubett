@@ -57,7 +57,15 @@ export function isWithinActiveHours(start: string, end: string): boolean {
   const [sh, sm] = start.split(':').map(Number);
   const [eh, em] = end.split(':').map(Number);
   const mins = now.getHours() * 60 + now.getMinutes();
-  return mins >= sh * 60 + sm && mins <= eh * 60 + em;
+  const startMins = sh * 60 + sm;
+  const endMins = eh * 60 + em;
+
+  if (startMins <= endMins) {
+    // Same-day range (e.g., 06:00–22:00)
+    return mins >= startMins && mins <= endMins;
+  }
+  // Overnight range (e.g., 22:00–07:00)
+  return mins >= startMins || mins <= endMins;
 }
 
 /** Returns true if enough time has passed since the last trigger. */

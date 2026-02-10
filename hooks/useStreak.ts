@@ -81,7 +81,7 @@ export function useStreak() {
         currentStreak: newCurrent,
         longestStreak: newLongest,
         lastCheckDate: today,
-        totalChecks: prev.totalChecks + 1,
+        totalChecks: days.size,
         checkedDays: [...days],
       };
 

@@ -46,6 +46,8 @@ export function useChecklist() {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const initialized = useRef(false);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   // ── Load from storage ─────────────────────────────────────
   useEffect(() => {
@@ -114,13 +116,13 @@ export function useChecklist() {
           next.add(id);
         }
 
-        const currentActive = items.filter((i) => i.isActive);
+        const currentActive = itemsRef.current.filter((i) => i.isActive);
         completed = currentActive.every((i) => next.has(i.id));
         return next;
       });
       return completed;
     },
-    [items],
+    [],
   );
 
   // ── Add item ──────────────────────────────────────────────
