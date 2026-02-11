@@ -15,7 +15,7 @@ jest.mock('../lib/notifications', () => ({
   isWithinQuietHours: jest.fn(),
 }));
 
-const TASK_NAME = 'doorcheck-departure-check';
+const TASK_NAME = 'ubett-departure-check';
 
 function seedSettings(overrides: Record<string, any> = {}) {
   const settings = {
@@ -31,7 +31,7 @@ function seedSettings(overrides: Record<string, any> = {}) {
     homeRadiusMeters: 150,
     ...overrides,
   };
-  store.set('doorcheck_trigger_settings', JSON.stringify(settings));
+  store.set('ubett_trigger_settings', JSON.stringify(settings));
 }
 
 function mockTime(hours: number, minutes: number) {
@@ -109,7 +109,7 @@ describe('background WiFi departure task', () => {
     expect(scheduleDepartureNotification).toHaveBeenCalledTimes(1);
 
     // Verify lastTriggeredAt was updated
-    const stored = JSON.parse(store.get('doorcheck_trigger_settings')!);
+    const stored = JSON.parse(store.get('ubett_trigger_settings')!);
     expect(stored.lastTriggeredAt).toBeTruthy();
   });
 });

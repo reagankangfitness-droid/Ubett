@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEYS = {
-  items: 'doorcheck_items',
-  checks: 'doorcheck_checks',
-  lastReset: 'doorcheck_last_reset',
+  items: 'ubett_items',
+  checks: 'ubett_checks',
+  lastReset: 'ubett_last_reset',
 } as const;
 
 export const FREE_TIER_LIMIT = 6;

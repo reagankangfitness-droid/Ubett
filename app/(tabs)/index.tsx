@@ -83,7 +83,7 @@ export default function CheckScreen() {
       nudgeShown.current = true;
       setTimeout(() => {
         Alert.alert(
-          'Loving DoorCheck?',
+          'Loving Ubett?',
           'Upgrade to PRO for unlimited items, multiple locations, and more!',
           [
             { text: 'Maybe Later', style: 'cancel' },

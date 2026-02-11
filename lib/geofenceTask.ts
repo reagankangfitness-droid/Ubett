@@ -10,7 +10,7 @@ import {
 } from './triggerSettings';
 import { scheduleDepartureNotification } from './notifications';
 
-export const GEOFENCE_TASK_NAME = 'doorcheck-geofence-task';
+export const GEOFENCE_TASK_NAME = 'ubett-geofence-task';
 
 /**
  * Define the geofence background task. Must be called at module level.

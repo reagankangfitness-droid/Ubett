@@ -27,8 +27,8 @@ import { requestNotificationPermissions } from '@/lib/notifications';
 import { loadTriggerSettings, saveTriggerSettings } from '@/lib/triggerSettings';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const ONBOARDING_KEY = 'doorcheck_onboarding_complete';
-const ITEMS_KEY = 'doorcheck_items';
+const ONBOARDING_KEY = 'ubett_onboarding_complete';
+const ITEMS_KEY = 'ubett_items';
 const TOTAL_PAGES = 4;
 
 // ── Item data ──────────────────────────────────────────────
@@ -251,7 +251,7 @@ export default function OnboardingScreen() {
               Never forget your{'\n'}keys again
             </Text>
             <Text style={styles.pageSubtitle}>
-              DoorCheck is the 10-second habit that saves you from the daily
+              Ubett is the 10-second habit that saves you from the daily
               {' "'}did I forget something?{'"'} panic.
             </Text>
           </View>
@@ -329,12 +329,12 @@ export default function OnboardingScreen() {
             <View style={styles.notifCard}>
               <View style={styles.notifHeader}>
                 <Text style={styles.notifAppIcon}>{'\uD83D\uDEAA'}</Text>
-                <Text style={styles.notifAppName}>DOORCHECK</Text>
+                <Text style={styles.notifAppName}>UBETT</Text>
                 <Text style={styles.notifTime}>now</Text>
               </View>
               <Text style={styles.notifTitle}>Heading out?</Text>
               <Text style={styles.notifBody}>
-                Time for your door check!
+                Time for your Ubett check!
               </Text>
               <View style={styles.notifAction}>
                 <Text style={styles.notifActionText}>Open Checklist</Text>
@@ -342,7 +342,7 @@ export default function OnboardingScreen() {
             </View>
 
             <Text style={styles.pageSubtitle}>
-              Your first door check is ready.
+              Your first check is ready.
             </Text>
           </View>
         </PageContent>
@@ -407,7 +407,7 @@ export default function OnboardingScreen() {
             ]}
             onPress={handleComplete}
           >
-            <Text style={styles.primaryBtnText}>Start Using DoorCheck</Text>
+            <Text style={styles.primaryBtnText}>Start Using Ubett</Text>
           </Pressable>
         )}
       </View>

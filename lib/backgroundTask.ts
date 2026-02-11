@@ -11,7 +11,7 @@ import {
 } from './triggerSettings';
 import { scheduleDepartureNotification } from './notifications';
 
-export const DEPARTURE_TASK_NAME = 'doorcheck-departure-check';
+export const DEPARTURE_TASK_NAME = 'ubett-departure-check';
 
 /**
  * Define the background task.  Must be called at module-level (outside components).

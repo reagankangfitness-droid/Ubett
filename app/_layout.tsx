@@ -45,7 +45,7 @@ export default function RootLayout() {
       await setupNotificationChannel();
       await setupNotificationCategories();
 
-      const done = await AsyncStorage.getItem('doorcheck_onboarding_complete');
+      const done = await AsyncStorage.getItem('ubett_onboarding_complete');
 
       if (done === 'true') {
         // Returning user — normal startup
@@ -72,8 +72,8 @@ export default function RootLayout() {
           // Reset today's checks so the user gets a fresh checklist
           const d = new Date();
           const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          await AsyncStorage.setItem('doorcheck_checks', '[]');
-          await AsyncStorage.setItem('doorcheck_last_reset', today);
+          await AsyncStorage.setItem('ubett_checks', '[]');
+          await AsyncStorage.setItem('ubett_last_reset', today);
 
           // Navigate to the checklist tab
           router.navigate('/');

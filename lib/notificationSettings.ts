@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = 'doorcheck_notification_settings';
+const STORAGE_KEY = 'ubett_notification_settings';
 
 export interface NotificationSettings {
   departureNotifications: boolean;

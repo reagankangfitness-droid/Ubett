@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "DoorCheck",
-    "slug": "doorcheck",
+    "name": "Ubett",
+    "slug": "ubett",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "doorcheck",
+    "scheme": "ubett",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.doorcheck.app",
+      "bundleIdentifier": "com.ubett.app",
       "infoPlist": {
         "UIBackgroundModes": ["location"]
       }
@@ -26,7 +26,7 @@
         "backgroundColor": "#FDF6EC"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.doorcheck.app"
+      "package": "com.ubett.app"
     },
     "web": {
       "bundler": "metro",
@@ -53,8 +53,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "DoorCheck uses your location to detect when you leave home so it can remind you to check your essentials.",
-          "locationWhenInUsePermission": "DoorCheck uses your location to set your home position.",
+          "locationAlwaysAndWhenInUsePermission": "Ubett uses your location to detect when you leave home so it can remind you to check your essentials.",
+          "locationWhenInUsePermission": "Ubett uses your location to set your home position.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }

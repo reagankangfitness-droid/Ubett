@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = 'doorcheck_trigger_settings';
+const STORAGE_KEY = 'ubett_trigger_settings';
 
 export interface TriggerSettings {
   enabled: boolean;

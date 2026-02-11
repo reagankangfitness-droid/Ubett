@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { loadNotificationSettings, isWithinQuietHours } from './notificationSettings';
 
-const STREAK_NOTIF_ID_KEY = 'doorcheck_streak_notification_id';
+const STREAK_NOTIF_ID_KEY = 'ubett_streak_notification_id';
 
 /** Configure how notifications appear when the app is in the foreground. */
 Notifications.setNotificationHandler({
@@ -143,7 +143,7 @@ export async function scheduleStreakReminder(): Promise<void> {
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: '\uD83D\uDD25 Don\u2019t break your streak!',
-        body: 'You haven\u2019t done your door check today.',
+        body: 'You haven\u2019t done your Ubett check today.',
         sound: true,
         color: '#E85D26',
         ...(Platform.OS === 'android' ? { channelId: 'streaks' } : {}),
@@ -181,9 +181,9 @@ function todayKey(): string {
 async function areTodayChecksComplete(): Promise<boolean> {
   try {
     const [rawItems, rawChecks, rawReset] = await AsyncStorage.multiGet([
-      'doorcheck_items',
-      'doorcheck_checks',
-      'doorcheck_last_reset',
+      'ubett_items',
+      'ubett_checks',
+      'ubett_last_reset',
     ]);
 
     // If checks weren't reset today, they're stale (not done today)

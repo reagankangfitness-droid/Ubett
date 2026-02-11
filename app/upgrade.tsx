@@ -80,7 +80,7 @@ export default function UpgradeScreen() {
         {/* Header */}
         <Animated.View entering={FadeIn.duration(300)} style={styles.headerSection}>
           <Text style={styles.headerEmoji}>{'\uD83D\uDE80'}</Text>
-          <Text style={styles.headerTitle}>DoorCheck PRO</Text>
+          <Text style={styles.headerTitle}>Ubett PRO</Text>
           <Text style={styles.headerSubtitle}>Unlock the full experience</Text>
         </Animated.View>
 

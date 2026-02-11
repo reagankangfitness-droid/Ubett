@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = 'doorcheck_streak';
+const STORAGE_KEY = 'ubett_streak';
 
 export interface StreakData {
   currentStreak: number;

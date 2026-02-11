@@ -60,7 +60,7 @@ describe('useStreak', () => {
     // Seed: checked yesterday, streak = 1
     const yesterday = yesterdayKey();
     store.set(
-      'doorcheck_streak',
+      'ubett_streak',
       JSON.stringify({
         currentStreak: 1,
         longestStreak: 1,
@@ -87,7 +87,7 @@ describe('useStreak', () => {
     const dateStr = `${threeDaysAgo.getFullYear()}-${String(threeDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(threeDaysAgo.getDate()).padStart(2, '0')}`;
 
     store.set(
-      'doorcheck_streak',
+      'ubett_streak',
       JSON.stringify({
         currentStreak: 5,
         longestStreak: 5,
@@ -111,7 +111,7 @@ describe('useStreak', () => {
     const dateStr = `${threeDaysAgo.getFullYear()}-${String(threeDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(threeDaysAgo.getDate()).padStart(2, '0')}`;
 
     store.set(
-      'doorcheck_streak',
+      'ubett_streak',
       JSON.stringify({
         currentStreak: 10,
         longestStreak: 10,
@@ -133,7 +133,7 @@ describe('useStreak', () => {
   it('totalChecks equals checkedDays count', async () => {
     const yesterday = yesterdayKey();
     store.set(
-      'doorcheck_streak',
+      'ubett_streak',
       JSON.stringify({
         currentStreak: 1,
         longestStreak: 1,

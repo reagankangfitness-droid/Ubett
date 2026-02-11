@@ -126,7 +126,7 @@ describe('useChecklist', () => {
     });
     // Wait for the persist effect
     await act(async () => {});
-    const stored = store.get('doorcheck_checks');
+    const stored = store.get('ubett_checks');
     expect(stored).toBeDefined();
     expect(JSON.parse(stored!)).toContain('1');
   });
@@ -138,11 +138,11 @@ describe('useChecklist', () => {
 
   it('resets checks on midnight rollover', async () => {
     // Seed storage with yesterday's reset date and some checks
-    store.set('doorcheck_items', JSON.stringify([
+    store.set('ubett_items', JSON.stringify([
       { id: '1', emoji: '📱', label: 'Phone', sortOrder: 0, isActive: true },
     ]));
-    store.set('doorcheck_checks', JSON.stringify(['1']));
-    store.set('doorcheck_last_reset', '2020-01-01'); // old date
+    store.set('ubett_checks', JSON.stringify(['1']));
+    store.set('ubett_last_reset', '2020-01-01'); // old date
 
     const { result } = await renderAndWait();
     expect(result.current.checked.size).toBe(0);

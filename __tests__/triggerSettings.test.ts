@@ -139,7 +139,7 @@ describe('load/save round-trip', () => {
 
   it('merges with defaults for partial data', async () => {
     await AsyncStorage.setItem(
-      'doorcheck_trigger_settings',
+      'ubett_trigger_settings',
       JSON.stringify({ enabled: true }),
     );
     const loaded = await loadTriggerSettings();

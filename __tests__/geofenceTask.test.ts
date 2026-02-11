@@ -14,7 +14,7 @@ jest.mock('../lib/notifications', () => ({
   isWithinQuietHours: jest.fn(),
 }));
 
-const TASK_NAME = 'doorcheck-geofence-task';
+const TASK_NAME = 'ubett-geofence-task';
 
 function seedSettings(overrides: Record<string, any> = {}) {
   const settings = {
@@ -30,7 +30,7 @@ function seedSettings(overrides: Record<string, any> = {}) {
     homeRadiusMeters: 150,
     ...overrides,
   };
-  store.set('doorcheck_trigger_settings', JSON.stringify(settings));
+  store.set('ubett_trigger_settings', JSON.stringify(settings));
 }
 
 function mockTime(hours: number, minutes: number) {

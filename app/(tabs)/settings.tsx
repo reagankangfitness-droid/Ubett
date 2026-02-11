@@ -161,7 +161,7 @@ export default function SettingsScreen() {
     if (!bg.granted) {
       Alert.alert(
         'Background Location Required',
-        'DoorCheck needs "Always Allow" location access for geofencing to work when the app is closed.',
+        'Ubett needs "Always Allow" location access for geofencing to work when the app is closed.',
       );
       return;
     }
@@ -267,9 +267,9 @@ export default function SettingsScreen() {
 
   const handleRateApp = () => {
     const url = Platform.select({
-      ios: 'https://apps.apple.com/app/doorcheck/id000000000',
-      android: 'https://play.google.com/store/apps/details?id=com.doorcheck.app',
-      default: 'https://doorcheck.app',
+      ios: 'https://apps.apple.com/app/ubett/id000000000',
+      android: 'https://play.google.com/store/apps/details?id=com.ubett.app',
+      default: 'https://ubett.app',
     });
     Linking.openURL(url);
   };
@@ -277,16 +277,16 @@ export default function SettingsScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: 'Check out DoorCheck — never forget your essentials when leaving home! https://doorcheck.app',
+        message: 'Check out Ubett — never forget your essentials when leaving home! https://ubett.app',
       });
     } catch {
       // User cancelled share
     }
   };
 
-  const handleContactSupport = () => Linking.openURL('mailto:support@doorcheck.app');
-  const handlePrivacyPolicy = () => Linking.openURL('https://doorcheck.app/privacy');
-  const handleTerms = () => Linking.openURL('https://doorcheck.app/terms');
+  const handleContactSupport = () => Linking.openURL('mailto:support@ubett.app');
+  const handlePrivacyPolicy = () => Linking.openURL('https://ubett.app/privacy');
+  const handleTerms = () => Linking.openURL('https://ubett.app/terms');
 
   // ── PRO handler ───────────────────────────────────────────────
 
@@ -540,7 +540,7 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
 
           <Pressable style={styles.row} onPress={handleRateApp}>
-            <Text style={styles.rowLabel}>Rate DoorCheck \u2B50</Text>
+            <Text style={styles.rowLabel}>Rate Ubett \u2B50</Text>
             <Text style={styles.chevron}>{'\u203A'}</Text>
           </Pressable>
 
@@ -573,12 +573,12 @@ export default function SettingsScreen() {
           </Pressable>
         </View>
 
-        {/* ── DoorCheck PRO ──────────────────────────── */}
+        {/* ── Ubett PRO ──────────────────────────── */}
         {!isPro && (
           <>
-            <Text style={styles.sectionTitle}>DOORCHECK PRO</Text>
+            <Text style={styles.sectionTitle}>UBETT PRO</Text>
             <View style={styles.proCard}>
-              <Text style={styles.proTitle}>Unlock DoorCheck PRO</Text>
+              <Text style={styles.proTitle}>Unlock Ubett PRO</Text>
               <View style={styles.proBenefits}>
                 {PRO_BENEFITS.map((benefit) => (
                   <View key={benefit} style={styles.proBenefitRow}>
@@ -642,7 +642,7 @@ export default function SettingsScreen() {
       <BottomSheet visible={locationExplanationVisible} onClose={() => setLocationExplanationVisible(false)}>
         <Text style={styles.pickerTitle}>Background Location</Text>
         <Text style={styles.explanationText}>
-          DoorCheck uses a geofence around your home to detect when you leave. This requires "Always
+          Ubett uses a geofence around your home to detect when you leave. This requires "Always
           Allow" location access. Your location is never tracked or stored.
         </Text>
         <Pressable style={styles.explanationBtn} onPress={handleLocationExplanationContinue}>
